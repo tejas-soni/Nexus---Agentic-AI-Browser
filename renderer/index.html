@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexus Browser</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/animations.css">
+</head>
+<body>
+  <!-- ─── Title Bar ───────────────────────────────────────────── -->
+  <div class="titlebar" id="titlebar">
+    <div class="titlebar__controls">
+      <button class="titlebar__btn" id="btn-minimize" title="Minimize">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>
+      </button>
+      <button class="titlebar__btn" id="btn-maximize" title="Maximize">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+      </button>
+      <button class="titlebar__btn titlebar__btn--close" id="btn-close" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── Main App ────────────────────────────────────────────── -->
+  <div class="app">
+    <!-- ─── Sidebar ─────────────────────────────────────────── -->
+    <aside class="sidebar expanded" id="sidebar">
+      <div class="sidebar__brand" id="sidebar-toggle">
+        <div class="sidebar__logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        </div>
+        <span class="sidebar__title">Nexus</span>
+      </div>
+
+      <nav class="sidebar__nav">
+        <div class="sidebar__item active" data-panel="home" id="nav-home">
+          <span class="sidebar__item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </span>
+          <span class="sidebar__item-label">Home</span>
+        </div>
+
+        <div class="sidebar__section-title">AI Tools</div>
+
+        <div class="sidebar__item" data-panel="chat" id="nav-chat">
+          <span class="sidebar__item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </span>
+          <span class="sidebar__item-label">AI Chat</span>
+        </div>
+
+        <div class="sidebar__item" data-panel="agents" id="nav-agents">
+          <span class="sidebar__item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          </span>
+          <span class="sidebar__item-label">Agents</span>
+        </div>
+
+        <div class="sidebar__item" data-panel="imagegen" id="nav-imagegen">
+          <span class="sidebar__item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </span>
+          <span class="sidebar__item-label">Image Gen</span>
+        </div>
+
+        <div class="sidebar__section-title">Workspace</div>
+
+        <div class="sidebar__item" data-panel="notes" id="nav-notes">
+          <span class="sidebar__item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </span>
+          <span class="sidebar__item-label">Notes</span>
+        </div>
+
+        <div class="sidebar__item" data-panel="bookmarks" id="nav-bookmarks">
+          <span class="sidebar__item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          </span>
+          <span class="sidebar__item-label">Bookmarks</span>
+        </div>
+      </nav>
+
+      <div class="sidebar__bottom">
+        <div class="sidebar__item" data-panel="settings" id="nav-settings">
+          <span class="sidebar__item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </span>
+          <span class="sidebar__item-label">Settings</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ─── Main Content ────────────────────────────────────── -->
+    <div class="main-content">
+      <!-- Tab Strip -->
+      <div class="tabstrip" id="tabstrip">
+        <div id="tab-list"></div>
+        <button class="tab--new" id="btn-new-tab" title="New Tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+
+      <!-- Address Bar -->
+      <div class="addressbar" id="addressbar">
+        <div class="addressbar__nav-btns">
+          <button class="addressbar__btn" id="btn-back" title="Back" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          </button>
+          <button class="addressbar__btn" id="btn-forward" title="Forward" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+          <button class="addressbar__btn" id="btn-reload" title="Reload">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </button>
+        </div>
+
+        <div class="addressbar__url">
+          <span class="addressbar__url-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </span>
+          <input type="text" class="addressbar__url-input" id="url-input" placeholder="Search or enter URL..." autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="addressbar__actions">
+          <button class="addressbar__btn" id="btn-bookmark" title="Bookmark this page">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          </button>
+          <button class="addressbar__ai-btn" id="btn-ai-toggle" title="Open AI Assistant">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            <span>AI</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Webview Container -->
+      <div class="webview-container" id="webview-container">
+        <!-- New Tab Page (shown when no webview is active) -->
+        <div class="newtab" id="newtab-page">
+          <div class="newtab__hero">
+            <div class="newtab__logo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            </div>
+            <h1 class="newtab__title">Nexus</h1>
+            <p class="newtab__subtitle">AI-powered browsing. Ask anything, create agents, or just explore.</p>
+          </div>
+
+          <div class="newtab__search">
+            <span class="newtab__search-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </span>
+            <input type="text" class="newtab__search-input" id="newtab-search" placeholder="Search the web or ask AI..." autocomplete="off" spellcheck="false">
+          </div>
+
+          <div class="newtab__shortcuts" id="newtab-shortcuts">
+            <div class="newtab__shortcut" data-url="https://www.google.com">
+              <div class="newtab__shortcut-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </div>
+              <span class="newtab__shortcut-name">Google</span>
+            </div>
+            <div class="newtab__shortcut" data-url="https://www.youtube.com">
+              <div class="newtab__shortcut-icon" style="color: #FF0000;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              </div>
+              <span class="newtab__shortcut-name">YouTube</span>
+            </div>
+            <div class="newtab__shortcut" data-url="https://github.com">
+              <div class="newtab__shortcut-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+              </div>
+              <span class="newtab__shortcut-name">GitHub</span>
+            </div>
+            <div class="newtab__shortcut" data-url="https://reddit.com">
+              <div class="newtab__shortcut-icon" style="color: #FF4500;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+              </div>
+              <span class="newtab__shortcut-name">Reddit</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Right Panel ─────────────────────────────────────── -->
+    <div class="right-panel" id="right-panel">
+      <!-- Chat Panel -->
+      <div class="panel-section" id="panel-chat">
+        <div class="panel-header">
+          <span class="panel-header__title">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            AI Chat
+          </span>
+          <button class="panel-header__close" id="close-chat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="chat">
+          <div class="chat__messages" id="chat-messages">
+            <div class="chat__message chat__message--ai">
+              <div class="chat__avatar chat__avatar--ai">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+              </div>
+              <div class="chat__bubble">
+                Hi! I'm your Nexus AI assistant. I can help you search the web, answer questions, generate images, and more. How can I help you today? ✨
+              </div>
+            </div>
+          </div>
+          <div class="chat__input-area">
+            <div class="chat__input-wrapper">
+              <span class="chat__brain-label">Model Selection</span>
+              <select class="chat__model-select" id="chat-model-select" title="Choose AI Model">
+                <option value="">Loading models...</option>
+              </select>
+            </div>
+            <div class="chat__input-wrapper">
+              <span class="chat__brain-label">Ask Anything</span>
+              <textarea class="chat__input" id="chat-input" placeholder="Type your message here..." rows="1"></textarea>
+            </div>
+            <div class="chat__actions">
+              <button class="chat__send hidden" id="chat-stop" title="Stop AI" style="background:var(--danger);color:white">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12"/></svg>
+              </button>
+              <button class="chat__send" id="chat-send">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agents Panel -->
+      <div class="panel-section" id="panel-agents">
+        <div class="panel-header">
+          <span class="panel-header__title">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+            Agents
+          </span>
+          <button class="panel-header__close" id="close-agents">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="panel-body" id="agents-body">
+          <button class="btn btn-primary" id="btn-create-agent" style="width:100%;margin-bottom:16px">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Create New Agent
+          </button>
+          <div class="agent-list" id="agent-list"></div>
+        </div>
+      </div>
+
+      <!-- Image Gen Panel -->
+      <div class="panel-section" id="panel-imagegen">
+        <div class="panel-header">
+          <span class="panel-header__title">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            Image Generator
+          </span>
+          <button class="panel-header__close" id="close-imagegen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="imagegen">
+          <div class="imagegen__gallery" id="imagegen-gallery">
+            <div class="empty-state">
+              <div class="empty-state__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              </div>
+              <div class="empty-state__title">No images yet</div>
+              <div class="empty-state__desc">Describe an image below and AI will generate it for you, completely free.</div>
+            </div>
+          </div>
+          <div class="panel-footer" style="display:flex;gap:8px;align-items:flex-end;">
+            <textarea class="chat__input" id="imagegen-prompt" placeholder="Describe the image you want..." rows="1"></textarea>
+            <button class="chat__send" id="imagegen-send" title="Generate Image">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes Panel -->
+      <div class="panel-section" id="panel-notes">
+        <div class="panel-header">
+          <span class="panel-header__title">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Notes
+          </span>
+          <button class="panel-header__close" id="close-notes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="panel-body" id="notes-body">
+          <button class="btn btn-primary" id="btn-new-note" style="width:100%;margin-bottom:16px">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New Note
+          </button>
+          <div class="note-list" id="note-list"></div>
+        </div>
+      </div>
+
+      <!-- Settings Panel -->
+      <div class="panel-section" id="panel-settings">
+        <div class="panel-header">
+          <span class="panel-header__title">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Settings
+          </span>
+          <button class="panel-header__close" id="close-settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="settings panel-body" id="settings-body"></div>
+      </div>
+
+      <!-- Bookmarks Panel -->
+      <div class="panel-section" id="panel-bookmarks">
+        <div class="panel-header">
+          <span class="panel-header__title">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            Bookmarks
+          </span>
+          <button class="panel-header__close" id="close-bookmarks">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="panel-body" id="bookmarks-body">
+          <div class="note-list" id="bookmark-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Modal Container -->
+  <div id="modal-container"></div>
+
+  <!-- Scripts -->
+  <script src="js/app.js"></script>
+</body>
+</html>

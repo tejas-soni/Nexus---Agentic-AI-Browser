@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexus — Setup</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; }
+
+    .setup { width: 100%; height: 100%; display: flex; flex-direction: column; }
+
+    .setup__titlebar {
+      -webkit-app-region: drag;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0 8px;
+      flex-shrink: 0;
+    }
+    .setup__titlebar-btns { -webkit-app-region: no-drag; display: flex; gap: 2px; }
+    .setup__titlebar-btn {
+      width: 32px; height: 28px; display: flex; align-items: center; justify-content: center;
+      border-radius: 6px; color: var(--text-secondary);
+      transition: all 150ms ease;
+    }
+    .setup__titlebar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .setup__titlebar-btn--close:hover { background: var(--error); color: white; }
+
+    .setup__body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 48px 40px;
+      overflow-y: auto;
+    }
+
+    /* Progress Dots */
+    .setup__progress {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+    .setup__dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--bg-overlay); transition: all 0.3s ease;
+    }
+    .setup__dot.active { background: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+    .setup__dot.done { background: var(--success); }
+
+    /* Steps */
+    .setup__step { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 520px; }
+    .setup__step.active { display: flex; animation: slide-in-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+    /* Step 1: Welcome */
+    .setup__hero-logo {
+      width: 80px; height: 80px; border-radius: 20px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 24px;
+      box-shadow: 0 0 48px rgba(124, 92, 252, 0.3);
+      animation: float 3s ease-in-out infinite;
+    }
+    .setup__hero-logo svg { width: 40px; height: 40px; color: white; }
+    .setup__hero-title {
+      font-size: 36px; font-weight: 800; letter-spacing: -0.03em;
+      margin-bottom: 8px; text-align: center;
+      background: linear-gradient(135deg, var(--text-primary), var(--accent-light));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .setup__hero-desc {
+      color: var(--text-secondary); font-size: 15px; text-align: center;
+      max-width: 380px; margin-bottom: 32px; line-height: 1.6;
+    }
+    .setup__features {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      width: 100%; margin-bottom: 32px;
+    }
+    .setup__feature {
+      display: flex; gap: 12px; align-items: flex-start;
+      padding: 14px 16px; border-radius: 12px;
+      background: var(--bg-surface); border: 1px solid var(--border);
+    }
+    .setup__feature-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--accent-subtle); color: var(--accent-light);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .setup__feature-icon svg { width: 16px; height: 16px; }
+    .setup__feature-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+    .setup__feature-desc { font-size: 11px; color: var(--text-secondary); line-height: 1.4; }
+
+    /* Step 2: Provider */
+    .step-title {
+      font-size: 22px; font-weight: 700; margin-bottom: 4px; text-align: center;
+    }
+    .step-desc {
+      color: var(--text-secondary); font-size: 14px; text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .provider-cards { display: flex; gap: 12px; width: 100%; margin-bottom: 24px; }
+    .provider-card {
+      flex: 1; padding: 20px; border-radius: 14px;
+      background: var(--bg-surface); border: 2px solid var(--border);
+      cursor: pointer; transition: all 0.25s ease; text-align: center;
+    }
+    .provider-card:hover { border-color: var(--border-medium); transform: translateY(-2px); }
+    .provider-card.selected { border-color: var(--accent); background: var(--accent-subtle); }
+    .provider-card__icon { font-size: 28px; margin-bottom: 8px; }
+    .provider-card__title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .provider-card__desc { font-size: 11px; color: var(--text-secondary); line-height: 1.4; }
+    .provider-card__badge {
+      display: inline-flex; padding: 2px 8px; margin-top: 8px;
+      border-radius: 99px; font-size: 10px; font-weight: 700;
+    }
+
+    .provider-config {
+      width: 100%; display: none; flex-direction: column; gap: 12px;
+      animation: slide-in-up 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .provider-config.active { display: flex; }
+
+    .provider-status {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px; border-radius: 10px;
+      font-size: 12px; font-weight: 500;
+    }
+    .provider-status--success { background: var(--success-dim); color: var(--success); }
+    .provider-status--error   { background: var(--error-dim);   color: var(--error); }
+    .provider-status--loading { background: var(--info-dim);    color: var(--info); }
+
+    /* Step 3: Terms */
+    .terms-box {
+      width: 100%; max-height: 280px; overflow-y: auto;
+      padding: 20px; border-radius: 12px;
+      background: var(--bg-surface); border: 1px solid var(--border);
+      font-size: 12px; color: var(--text-secondary); line-height: 1.7;
+      margin-bottom: 16px;
+    }
+    .terms-box h3 { color: var(--text-primary); font-size: 14px; margin: 12px 0 6px; }
+    .terms-box h3:first-child { margin-top: 0; }
+
+    .terms-accept {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 24px;
+      cursor: pointer; font-size: 13px; color: var(--text-secondary);
+    }
+    .terms-checkbox {
+      width: 20px; height: 20px; border-radius: 6px;
+      border: 2px solid var(--border-medium); background: var(--bg-elevated);
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s ease; flex-shrink: 0;
+    }
+    .terms-checkbox.checked {
+      background: var(--accent); border-color: var(--accent);
+    }
+    .terms-checkbox.checked svg { opacity: 1; }
+    .terms-checkbox svg { width: 14px; height: 14px; color: white; opacity: 0; transition: opacity 0.2s; }
+
+    /* Footer Nav */
+    .setup__footer {
+      display: flex; justify-content: space-between; align-items: center;
+      width: 100%; max-width: 520px; margin-top: auto; padding-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="setup" id="setup">
+    <!-- Title Bar -->
+    <div class="setup__titlebar">
+      <div class="setup__titlebar-btns">
+        <button class="setup__titlebar-btn" onclick="window.nexus.window.minimize()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>
+        </button>
+        <button class="setup__titlebar-btn setup__titlebar-btn--close" onclick="window.nexus.window.close()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="setup__body">
+      <!-- Progress -->
+      <div class="setup__progress">
+        <div class="setup__dot active" data-step="0"></div>
+        <div class="setup__dot" data-step="1"></div>
+        <div class="setup__dot" data-step="2"></div>
+      </div>
+
+      <!--==================== STEP 1: WELCOME ====================-->
+      <div class="setup__step active" id="step-0">
+        <div class="setup__hero-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        </div>
+        <h1 class="setup__hero-title">Welcome to Nexus</h1>
+        <p class="setup__hero-desc">Your free, AI-native agentic browser. Create intelligent agents that browse, search, book, and work for you.</p>
+
+        <div class="setup__features">
+          <div class="setup__feature">
+            <div class="setup__feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <div>
+              <div class="setup__feature-title">AI Chat</div>
+              <div class="setup__feature-desc">Chat with AI about anything, or about the page you're viewing</div>
+            </div>
+          </div>
+          <div class="setup__feature">
+            <div class="setup__feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+            </div>
+            <div>
+              <div class="setup__feature-title">Smart Agents</div>
+              <div class="setup__feature-desc">Create autonomous agents to perform complex tasks</div>
+            </div>
+          </div>
+          <div class="setup__feature">
+            <div class="setup__feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </div>
+            <div>
+              <div class="setup__feature-title">Image Generator</div>
+              <div class="setup__feature-desc">Generate stunning images from text prompts for free</div>
+            </div>
+          </div>
+          <div class="setup__feature">
+            <div class="setup__feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <div>
+              <div class="setup__feature-title">Smart Notes</div>
+              <div class="setup__feature-desc">Take notes that sync with your browsing sessions</div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-lg" onclick="nextStep()">
+          Get Started
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <!--==================== STEP 2: PROVIDER ====================-->
+      <div class="setup__step" id="step-1">
+        <h2 class="step-title">Choose Your AI Provider</h2>
+        <p class="step-desc">Both options are completely free. Pick what works best for you.</p>
+
+        <div class="provider-cards">
+          <div class="provider-card selected" id="card-openrouter" onclick="selectProvider('openrouter')">
+            <div class="provider-card__icon">☁️</div>
+            <div class="provider-card__title">OpenRouter</div>
+            <div class="provider-card__desc">Cloud-based AI models. Requires a free API key from openrouter.ai</div>
+            <span class="provider-card__badge badge badge-success">Recommended</span>
+          </div>
+          <div class="provider-card" id="card-ollama" onclick="selectProvider('ollama')">
+            <div class="provider-card__icon">🖥️</div>
+            <div class="provider-card__title">Ollama (Local)</div>
+            <div class="provider-card__desc">Run AI models on your own machine. Fully private & offline.</div>
+            <span class="provider-card__badge badge badge-info">Advanced</span>
+          </div>
+        </div>
+
+        <!-- OpenRouter Config -->
+        <div class="provider-config active" id="config-openrouter">
+          <div class="input-field">
+            <label class="input-label">OpenRouter API Key</label>
+            <input class="input" id="openrouter-key" type="password" placeholder="sk-or-v1-..." autocomplete="off">
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="window.nexus.shell.openExternal('https://openrouter.ai/keys')">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              Get Free API Key
+            </button>
+            <button class="btn btn-primary btn-sm" id="btn-test-openrouter" onclick="testOpenRouter()">Test Connection</button>
+          </div>
+          <div id="openrouter-status"></div>
+          <div class="input-field" id="openrouter-model-field" style="display:none">
+            <label class="input-label">Select Model</label>
+            <select class="select" id="openrouter-model"><option value="">Loading models...</option></select>
+          </div>
+        </div>
+
+        <!-- Ollama Config -->
+        <div class="provider-config" id="config-ollama">
+          <div class="input-field">
+            <label class="input-label">Ollama Server URL</label>
+            <input class="input" id="ollama-url" type="text" value="http://localhost:11434" placeholder="http://localhost:11434">
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-test-ollama" onclick="testOllama()">Test Connection</button>
+          <div id="ollama-status"></div>
+          <div class="input-field" id="ollama-model-field" style="display:none">
+            <label class="input-label">Select Model</label>
+            <select class="select" id="ollama-model"><option value="">Loading models...</option></select>
+          </div>
+        </div>
+
+        <div class="setup__footer">
+          <button class="btn btn-ghost" onclick="prevStep()">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            Back
+          </button>
+          <button class="btn btn-primary" id="btn-step2-next" onclick="nextStep()">
+            Continue
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!--==================== STEP 3: TERMS ====================-->
+      <div class="setup__step" id="step-2">
+        <h2 class="step-title">Terms & Conditions</h2>
+        <p class="step-desc">Please review and accept before continuing.</p>
+
+        <div class="terms-box">
+          <h3>1. Free & Open Source</h3>
+          <p>Nexus Browser is completely free and open source. The software is provided "as-is" without warranty of any kind. You may use, modify, and distribute it under the MIT License.</p>
+
+          <h3>2. AI Provider Usage</h3>
+          <p>Nexus connects to external AI services (OpenRouter) or your local Ollama instance. When using OpenRouter, your prompts are sent to their servers and are subject to OpenRouter's own privacy policy. When using Ollama, all processing happens locally on your device.</p>
+
+          <h3>3. Data & Privacy</h3>
+          <p>Nexus stores your settings, notes, bookmarks, and browsing history locally on your device. We do not collect, transmit, or sell any personal data. Your API keys are stored locally and encrypted.</p>
+
+          <h3>4. Agent Disclaimer</h3>
+          <p>AI agents perform actions on your behalf. While we implement safety measures, agents may occasionally produce incorrect results or take unintended actions. Always review agent actions before relying on them for important decisions.</p>
+
+          <h3>5. Content Generation</h3>
+          <p>AI-generated content (text, images) may not always be accurate, appropriate, or aligned with your expectations. You are responsible for reviewing and using generated content appropriately.</p>
+
+          <h3>6. Fair Usage</h3>
+          <p>Free API services have rate limits. Excessive use may result in temporary throttling. If you need higher throughput, consider upgrading to a paid API plan on OpenRouter or running larger local models.</p>
+        </div>
+
+        <div class="terms-accept" onclick="toggleTerms()">
+          <div class="terms-checkbox" id="terms-checkbox">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <span>I accept the Terms & Conditions</span>
+        </div>
+
+        <div class="setup__footer">
+          <button class="btn btn-ghost" onclick="prevStep()">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            Back
+          </button>
+          <button class="btn btn-primary" id="btn-launch" disabled onclick="finishSetup()">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            Launch Nexus
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 0;
+    let selectedProvider = 'openrouter';
+    let termsAccepted = false;
+    let providerValidated = false;
+
+    // ─── Navigation ─────────────────────────────────────────────
+    function goToStep(step) {
+      document.querySelectorAll('.setup__step').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.setup__dot').forEach((dot, i) => {
+        dot.classList.remove('active', 'done');
+        if (i < step) dot.classList.add('done');
+        if (i === step) dot.classList.add('active');
+      });
+      document.getElementById(`step-${step}`).classList.add('active');
+      currentStep = step;
+    }
+
+    function nextStep() { if (currentStep < 2) goToStep(currentStep + 1); }
+    function prevStep() { if (currentStep > 0) goToStep(currentStep - 1); }
+
+    // ─── Provider Selection ─────────────────────────────────────
+    function selectProvider(provider) {
+      selectedProvider = provider;
+      document.getElementById('card-openrouter').classList.toggle('selected', provider === 'openrouter');
+      document.getElementById('card-ollama').classList.toggle('selected', provider === 'ollama');
+      document.getElementById('config-openrouter').classList.toggle('active', provider === 'openrouter');
+      document.getElementById('config-ollama').classList.toggle('active', provider === 'ollama');
+    }
+
+    // ─── OpenRouter Test ────────────────────────────────────────
+    async function testOpenRouter() {
+      const key = document.getElementById('openrouter-key').value.trim();
+      if (!key) {
+        showStatus('openrouter-status', 'Please enter your API key.', 'error');
+        return;
+      }
+
+      showStatus('openrouter-status', 'Connecting to OpenRouter...', 'loading');
+      const btn = document.getElementById('btn-test-openrouter');
+      btn.disabled = true;
+
+      try {
+        const result = await window.nexus.setup.fetchOpenRouterModels(key);
+        if (result.success && result.models.length > 0) {
+          showStatus('openrouter-status', `Connected! Found ${result.models.length} free models.`, 'success');
+          populateModels('openrouter-model', result.models);
+          document.getElementById('openrouter-model-field').style.display = '';
+          providerValidated = true;
+        } else {
+          showStatus('openrouter-status', result.error || 'No free models found. Check API key.', 'error');
+        }
+      } catch (e) {
+        showStatus('openrouter-status', 'Connection failed: ' + e.message, 'error');
+      }
+      btn.disabled = false;
+    }
+
+    // ─── Ollama Test ────────────────────────────────────────────
+    async function testOllama() {
+      const url = document.getElementById('ollama-url').value.trim();
+      if (!url) {
+        showStatus('ollama-status', 'Please enter the server URL.', 'error');
+        return;
+      }
+
+      showStatus('ollama-status', 'Pinging Ollama...', 'loading');
+      const btn = document.getElementById('btn-test-ollama');
+      btn.disabled = true;
+
+      try {
+        const result = await window.nexus.setup.pingOllama(url);
+        if (result.success) {
+          showStatus('ollama-status', `Connected! Found ${result.models.length} model(s).`, 'success');
+          populateModels('ollama-model', result.models);
+          document.getElementById('ollama-model-field').style.display = '';
+          providerValidated = true;
+        } else {
+          showStatus('ollama-status', result.error || 'Cannot reach Ollama. Is it running?', 'error');
+        }
+      } catch (e) {
+        showStatus('ollama-status', 'Connection failed: ' + e.message, 'error');
+      }
+      btn.disabled = false;
+    }
+
+    // ─── Helpers ────────────────────────────────────────────────
+    function showStatus(containerId, message, type) {
+      const el = document.getElementById(containerId);
+      el.innerHTML = `<div class="provider-status provider-status--${type}">
+        ${type === 'loading' ? '<div class="spinner spinner--sm"></div>' : ''}
+        ${message}
+      </div>`;
+    }
+
+    function populateModels(selectId, models) {
+      const select = document.getElementById(selectId);
+      select.innerHTML = models.map(m =>
+        `<option value="${m.id}">${m.name}</option>`
+      ).join('');
+    }
+
+    function toggleTerms() {
+      termsAccepted = !termsAccepted;
+      document.getElementById('terms-checkbox').classList.toggle('checked', termsAccepted);
+      document.getElementById('btn-launch').disabled = !termsAccepted;
+    }
+
+    async function finishSetup() {
+      if (!termsAccepted) return;
+
+      const data = { provider: selectedProvider };
+
+      if (selectedProvider === 'openrouter') {
+        data.openrouterApiKey = document.getElementById('openrouter-key').value.trim();
+        data.openrouterModel = document.getElementById('openrouter-model').value;
+      } else {
+        data.ollamaBaseUrl = document.getElementById('ollama-url').value.trim();
+        data.ollamaModel = document.getElementById('ollama-model').value;
+      }
+
+      await window.nexus.setup.complete(data);
+    }
+  </script>
+</body>
+</html>
