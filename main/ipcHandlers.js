@@ -111,9 +111,21 @@ module.exports = function registerIpcHandlers() {
 
   // ─── Agents ────────────────────────────────────────────────────────────────
 
-  ipcMain.handle('agents:get', () => getAgents());
-  ipcMain.handle('agents:save', (_, agent) => saveAgent(agent));
-  ipcMain.handle('agents:delete', (_, agentId) => deleteAgent(agentId));
+  ipcMain.handle('agents:get', () => {
+    const agents = getAgents();
+    console.log(`[NEXUS:MAIN] agents:get -> ${agents.length} agents`);
+    return agents;
+  });
+  ipcMain.handle('agents:save', (_, agent) => {
+    const agents = saveAgent(agent);
+    console.log(`[NEXUS:MAIN] agents:save -> ${agents.length} agents`);
+    return agents;
+  });
+  ipcMain.handle('agents:delete', (_, agentId) => {
+    const agents = deleteAgent(agentId);
+    console.log(`[NEXUS:MAIN] agents:delete -> ${agents.length} agents`);
+    return agents;
+  });
 
   ipcMain.on('agent:run', (event, { agentId, goal, tabId, model }) => {
     if (runningAgents.has(agentId)) {

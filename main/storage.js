@@ -61,6 +61,15 @@ const schema = {
 
 let _store = null;
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function getStore() {
   if (!_store) {
     _store = new Store({ schema, name: 'nexus-data' });
@@ -163,7 +172,11 @@ function deleteNote(noteId) {
 // ─── Agents ───────────────────────────────────────────────────────────────────
 
 function getAgents() {
-  return getStore().get('agents', []);
+  return getStore().get('agents', []).map((agent) => ({
+    ...agent,
+    name: escapeHtml(agent.name),
+    description: escapeHtml(agent.description),
+  }));
 }
 
 function saveAgent(agent) {
