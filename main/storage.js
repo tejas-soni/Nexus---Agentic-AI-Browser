@@ -29,17 +29,8 @@ const schema = {
     default: {},
   },
   cachedModels: {
-    type: 'array',
-    items: {
-      type: 'object',
-      properties: {
-        id: { type: 'string' },
-        name: { type: 'string' },
-        context: { type: 'number' },
-        description: { type: 'string' }
-      }
-    },
-    default: [],
+    type: ['object', 'array'],
+    default: {},
   },
   agents: {
     type: 'array',
@@ -102,14 +93,45 @@ function saveSettings(settings) {
   if (settings.timeout !== undefined) store.set('llm.timeout', Number(settings.timeout));
 }
 
-function getCachedModels() {
-  return getStore().get('cachedModels', []);
+function getCachedModels(provider) {
+  const cached = getStore().get('cachedModels', {});
+
+  // Backward compatibility with the older single-array cache format.
+  if (Array.isArray(cached)) {
+    return cached;
+  }
+
+  if (provider) {
+    return Array.isArray(cached[provider]) ? cached[provider] : [];
+  }
+
+  return cached;
 }
 
-function cacheModels(models) {
-  if (Array.isArray(models) && models.length > 0) {
-    getStore().set('cachedModels', models);
+function cacheModels(providerOrModels, maybeModels) {
+  const hasProvider = typeof providerOrModels === 'string';
+  const provider = hasProvider ? providerOrModels : null;
+  const models = hasProvider ? maybeModels : providerOrModels;
+
+  if (!Array.isArray(models) || models.length === 0) {
+    return;
   }
+
+  const store = getStore();
+
+  if (!provider) {
+    store.set('cachedModels', models);
+    return;
+  }
+
+  const cached = store.get('cachedModels', {});
+
+  if (Array.isArray(cached)) {
+    store.set('cachedModels', { [provider]: models });
+    return;
+  }
+
+  store.set('cachedModels', { ...cached, [provider]: models });
 }
 
 // ─── Notes ────────────────────────────────────────────────────────────────────
@@ -205,12 +227,18 @@ function clearHistory() {
 // ─── Preferences ─────────────────────────────────────────────────────────────
 
 function getPreferences() {
-  return getStore().get('preferences', {});
+  const prefs = getStore().get('preferences', {});
+
+  return {
+    theme: prefs.theme ?? 'dark',
+    sidebarExpanded: prefs.sidebarExpanded ?? true,
+    homePage: prefs.homePage ?? 'nexus://newtab',
+  };
 }
 
 function savePreferences(prefs) {
   const store = getStore();
-  const current = store.get('preferences', {});
+  const current = getPreferences();
   
   // Only merge keys that belong to the preferences schema
   const allowedKeys = ['theme', 'sidebarExpanded', 'homePage'];

@@ -9,23 +9,49 @@ class SettingsService extends Service {
         this.log('Initializing Settings...');
         this.setupHandlers();
         
-        // PROACTIVE STARTUP HANDSHAKE:
-        // Attempt to pre-fetch models in the background so they are ready before the UI asks.
+        // Proactively hydrate the current provider's model cache on startup.
         setTimeout(() => {
             this.log('Startup: Attempting proactive background model fetch...');
-            const { cacheModels } = require('../storage');
             const settings = { ...getSettings(), ...getPreferences() };
-            const provider = settings.provider || 'openrouter';
-            
-            if (provider === 'openrouter' && settings.openrouterApiKey) {
-                llmRouter.fetchOpenRouterModels(settings.openrouterApiKey)
-                    .then(models => {
-                        this.log(`Startup: Successfully cached ${models.length} models.`);
-                        cacheModels(models);
-                    })
-                    .catch(e => this.log(`Startup: Background fetch skipped (Network or key busy): ${e.message}`));
-            }
+
+            this.refreshProviderModels(settings)
+                .then((models) => {
+                    if (!models.length) {
+                        return;
+                    }
+
+                    this.log(`Startup: Successfully cached ${models.length} models.`);
+                    this.send('updated', {
+                        ...settings,
+                        modelCacheReady: true,
+                        provider: settings.provider || 'openrouter',
+                    });
+                })
+                .catch((e) => this.log(`Startup: Background fetch skipped: ${e.message}`));
         }, 3000); // 3-second delay to allow OS network stack to settle
+    }
+
+    async refreshProviderModels(settings) {
+        const { cacheModels } = require('../storage');
+        const provider = settings.provider || 'openrouter';
+        let models = [];
+
+        if (provider === 'openrouter') {
+            if (!settings.openrouterApiKey) {
+                throw new Error('OpenRouter API key is missing.');
+            }
+            models = await llmRouter.fetchOpenRouterModels(settings.openrouterApiKey);
+        } else if (provider === 'ollama') {
+            models = await llmRouter.fetchOllamaModels(settings.ollamaBaseUrl || 'http://localhost:11434');
+        } else if (provider === 'pollinations') {
+            models = await llmRouter.fetchPollinationsModels();
+        }
+
+        if (models.length > 0) {
+            cacheModels(provider, models);
+        }
+
+        return models;
     }
 
     setupHandlers() {
@@ -56,28 +82,20 @@ class SettingsService extends Service {
             try {
                 const settings = { ...getSettings(), ...getPreferences() };
                 const provider = settings.provider || 'openrouter';
-                
-                let models = [];
-                if (provider === 'openrouter') {
-                    if (!settings.openrouterApiKey) throw new Error('OpenRouter API key is missing.');
-                    models = await llmRouter.fetchOpenRouterModels(settings.openrouterApiKey);
-                } else if (provider === 'ollama') {
-                    models = await llmRouter.fetchOllamaModels(settings.ollamaBaseUrl || 'http://localhost:11434');
-                } else if (provider === 'pollinations') {
-                    models = await llmRouter.fetchPollinationsModels();
-                }
+                const models = await this.refreshProviderModels(settings);
                 
                 if (models.length > 0) {
-                    cacheModels(models); // Store successfully fetched models to disk
+                    cacheModels(provider, models);
                 }
                 
                 this.log(`Fetched ${models.length} models for provider: ${provider}`);
                 return { success: true, models };
             } catch (error) {
                 this.log(`Fetch models failed dynamically: ${error.message}`);
-                const cached = getCachedModels();
+                const provider = (getSettings().provider || 'openrouter');
+                const cached = getCachedModels(provider);
                 if (cached && cached.length > 0) {
-                    this.log('Fallback to offline cached model list successful.');
+                    this.log(`Fallback to offline cached model list successful for provider: ${provider}.`);
                     return { success: true, models: cached, offline: true };
                 }
                 return { success: false, error: error.message };
@@ -86,7 +104,6 @@ class SettingsService extends Service {
 
         this.handle('test-connection', async () => {
             this.log('Handshake: Starting connection test sequence...');
-            const { cacheModels } = require('../storage');
             try {
                 // Ensure we use the latest settings from disk
                 const settings = { ...getSettings(), ...getPreferences() };
@@ -96,23 +113,26 @@ class SettingsService extends Service {
                 let result;
                 if (provider === 'openrouter') {
                     if (!settings.openrouterApiKey) throw new Error('Please enter an API key first.');
-                    const models = await llmRouter.fetchOpenRouterModels(settings.openrouterApiKey);
-                    cacheModels(models); // CRITICAL: Cache the models here too!
+                    const models = await this.refreshProviderModels(settings);
                     result = { success: true, message: `Cloud connection verified. Found ${models.length} models.` };
                 } else if (provider === 'ollama') {
                     const ok = await llmRouter.pingOllama(settings.ollamaBaseUrl || 'http://localhost:11434');
                     if (ok) {
-                        const models = await llmRouter.fetchOllamaModels(settings.ollamaBaseUrl || 'http://localhost:11434');
-                        cacheModels(models);
+                        const models = await this.refreshProviderModels(settings);
                         result = { success: true, message: `Local connection verified. ${models.length} models available.` };
                     } else {
                         throw new Error(`Could not reach Ollama at ${settings.ollamaBaseUrl}. Ensure the server is running.`);
                     }
                 } else if (provider === 'pollinations') {
-                    const models = await llmRouter.fetchPollinationsModels();
-                    cacheModels(models);
+                    const models = await this.refreshProviderModels(settings);
                     result = { success: true, message: `Pollinations API is reachable. ${models.length} models found.` };
                 }
+
+                this.send('updated', {
+                    ...settings,
+                    modelCacheReady: true,
+                    provider,
+                });
                 
                 this.log(`Test result: ${result.message}`);
                 return result;
