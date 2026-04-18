@@ -13,9 +13,12 @@
     "build:linux": "electron-builder --linux"
   },
   "dependencies": {
+    "@ghostery/adblocker-electron": "^2.14.1",
+    "cross-fetch": "^4.1.0",
     "electron-store": "^8.2.0",
     "highlight.js": "^11.10.0",
-    "marked": "^12.0.0"
+    "marked": "^12.0.0",
+    "sqlite3": "^6.0.1"
   },
   "devDependencies": {
     "electron": "^41.2.0",

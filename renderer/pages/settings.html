@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Settings - Nexus</title>
+    <link rel="stylesheet" href="../css/base.css">
+    <link rel="stylesheet" href="../css/layout.css">
+    <link rel="stylesheet" href="../css/components.css">
+    <style>
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+            animation: fade-in 0.4s ease-out;
+        }
+        .settings-header {
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+        }
+        .settings-header h1 {
+            font-size: 2.5rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .settings-layout {
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            gap: 60px;
+        }
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            position: sticky;
+            top: 40px;
+            height: fit-content;
+        }
+        .sidebar-nav button {
+            text-align: left;
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .sidebar-nav button.active {
+            color: var(--accent);
+            background: var(--bg-surface);
+            box-shadow: var(--shadow-sm);
+        }
+        .sidebar-nav button:hover:not(.active) {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+        }
+        .section-content {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+        }
+        .settings-group {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .settings-group h2 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin: 0;
+            color: var(--text-primary);
+        }
+        .setting-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 20px;
+            background: var(--bg-surface);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+        }
+        .setting-label {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .setting-description {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+        .setting-control {
+            margin-top: 8px;
+        }
+        .input-group {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="settings-header">
+        <h1>
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Settings
+        </h1>
+    </div>
+
+    <div class="settings-layout">
+        <div class="sidebar-nav">
+            <button class="active" onclick="showSection('general', event)">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                General
+            </button>
+            <button onclick="showSection('ai', event)">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                AI & Agents
+            </button>
+            <button onclick="showSection('privacy', event)">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Privacy
+            </button>
+        </div>
+
+        <div class="section-content">
+            <!-- General Section -->
+            <div id="section-general" class="settings-section">
+                <div class="settings-group">
+                    <h2>Appearance</h2>
+                    <div class="setting-item">
+                        <div class="setting-label">Theme</div>
+                        <div class="setting-description">Choose how Nexus looks to you.</div>
+                        <div class="setting-control">
+                            <select class="input" id="set-theme">
+                                <option value="dark">Dark (Recommended)</option>
+                                <option value="light">Light</option>
+                                <option value="system">Follow System</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h2>Search</h2>
+                    <div class="setting-item">
+                        <div class="setting-label">Default Search Engine</div>
+                        <div class="setting-description">Used for all searches in the address bar.</div>
+                        <div class="setting-control">
+                            <select class="input" id="set-search-engine">
+                                <option value="google">Google</option>
+                                <option value="duckduckgo">DuckDuckGo</option>
+                                <option value="bing">Bing</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Section -->
+            <div id="section-ai" class="settings-section hidden">
+                <div class="settings-group">
+                    <h2>AI Engine</h2>
+                    <div class="setting-item">
+                        <div class="setting-label">Provider</div>
+                        <div class="setting-description">The intelligence behind your browser agents.</div>
+                        <div class="setting-control">
+                            <select class="input" id="set-provider">
+                                <option value="openrouter">OpenRouter (Cloud)</option>
+                                <option value="ollama">Ollama (Local)</option>
+                                <option value="pollinations">Pollinations (Free)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="group-openrouter" class="setting-item">
+                        <div class="setting-label">OpenRouter API Key</div>
+                        <div class="setting-description">Required for high-performance cloud models.</div>
+                        <div class="setting-control">
+                            <div class="input-group">
+                                <input class="input" type="password" id="set-openrouterApiKey" placeholder="sk-or-v1-...">
+                                <button class="btn btn-ghost" id="btn-test-openrouter">Test Connection</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="group-ollama" class="setting-item hidden">
+                        <div class="setting-label">Ollama Base URL</div>
+                        <div class="setting-description">Where your local Ollama instance is running.</div>
+                        <div class="setting-control">
+                            <div class="input-group">
+                                <input class="input" type="text" id="set-ollamaBaseUrl" value="http://localhost:11434">
+                                <button class="btn btn-ghost" id="btn-test-ollama">Test Connection</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="conn-status" class="setting-item hidden">
+                        <div id="conn-status-msg" style="padding: 12px; border-radius: 8px; font-size: 0.9rem; font-weight: 500;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Privacy Section -->
+            <div id="section-privacy" class="settings-section hidden">
+                <div class="settings-group">
+                    <h2>Data Management</h2>
+                    <div class="setting-item">
+                        <div class="setting-label">Clear All Browsing Data</div>
+                        <div class="setting-description">This will remove all history, bookmarks, and saved notes.</div>
+                        <div class="setting-control">
+                            <button class="btn btn-danger" onclick="clearAllData()">Clear Everything</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 12px;">
+                <span id="save-status" style="align-self: center; font-size: 0.8rem; color: var(--accent); opacity: 0;">Settings saved!</span>
+                <button class="btn btn-primary btn-lg" id="btn-save-all">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CRITICAL FIX: Chromium Webview Preload Bypass
+        // Tunneled IPC bridge using console-messages
+        function sendIPC(action, data) {
+            return new Promise((resolve) => {
+                const reqId = Date.now().toString() + Math.random();
+                window._ipcCallbacks = window._ipcCallbacks || {};
+                window._ipcCallbacks[reqId] = resolve;
+                console.log('NEXUS_IPC:' + JSON.stringify({ action, data, reqId }));
+            });
+        }
+
+        const sections = document.querySelectorAll('.settings-section');
+        const navBtns = document.querySelectorAll('.sidebar-nav button');
+
+        function showSection(id, event) {
+            sections.forEach(s => s.classList.add('hidden'));
+            const targetSection = document.getElementById('section-' + id);
+            if (targetSection) targetSection.classList.remove('hidden');
+            
+            navBtns.forEach(b => b.classList.remove('active'));
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('active');
+            }
+        }
+
+        async function loadSettings() {
+            const s = await sendIPC('settings.get');
+            document.getElementById('set-theme').value = s.theme || 'dark';
+            document.getElementById('set-provider').value = s.provider || 'openrouter';
+            document.getElementById('set-openrouterApiKey').value = s.openrouterApiKey || '';
+            document.getElementById('set-ollamaBaseUrl').value = s.ollamaBaseUrl || 'http://localhost:11434';
+            
+            updateProviderGroups();
+        }
+
+        function updateProviderGroups() {
+            const provider = document.getElementById('set-provider').value;
+            document.getElementById('group-openrouter').classList.toggle('hidden', provider !== 'openrouter');
+            document.getElementById('group-ollama').classList.toggle('hidden', provider !== 'ollama');
+        }
+
+        document.getElementById('set-provider').onchange = updateProviderGroups;
+
+        async function saveSettings() {
+            const btn = document.getElementById('btn-save-all');
+            const status = document.getElementById('save-status');
+            
+            btn.disabled = true;
+            btn.innerText = 'Saving...';
+
+            const currentSettings = {
+                theme: document.getElementById('set-theme').value,
+                provider: document.getElementById('set-provider').value,
+                openrouterApiKey: document.getElementById('set-openrouterApiKey').value,
+                ollamaBaseUrl: document.getElementById('set-ollamaBaseUrl').value
+            };
+
+            try {
+                const res = await sendIPC('settings.save', currentSettings);
+                if (res.success) {
+                    status.style.opacity = '1';
+                    status.innerText = 'Settings saved locally!';
+                    setTimeout(() => { status.style.opacity = '0'; }, 3000);
+                } else {
+                    alert('Save failed: ' + res.error);
+                }
+            } catch (err) {
+                console.error('Save error:', err);
+                alert('Save error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Save Changes';
+            }
+        }
+
+        document.getElementById('btn-save-all').onclick = saveSettings;
+
+        async function testConnection() {
+            const statusDiv = document.getElementById('conn-status');
+            const statusMsg = document.getElementById('conn-status-msg');
+            const provider = document.getElementById('set-provider').value;
+            
+            statusDiv.classList.remove('hidden');
+            statusMsg.innerText = `Establishing handshake with ${provider}...`;
+            statusMsg.style.background = 'var(--bg-elevated)';
+            statusMsg.style.color = 'var(--text-secondary)';
+            
+            // First save current settings to ensure we test with what was just typed
+            await saveSettings();
+            
+            // Safety timeout for the UI (Matches backend timeout + grace)
+            const safetyTimeout = setTimeout(() => {
+                if (statusMsg.innerText.includes('Establishing')) {
+                    statusMsg.innerText = 'Error: The request timed out at the network layer. Ensure your provider is up.';
+                    statusMsg.style.background = 'rgba(248, 113, 113, 0.1)';
+                    statusMsg.style.color = 'var(--error)';
+                }
+            }, 12000);
+            
+            try {
+                const res = await sendIPC('settings.testConnection');
+                clearTimeout(safetyTimeout);
+                
+                if (res.success) {
+                    statusMsg.innerText = 'Verified: ' + res.message;
+                    statusMsg.style.background = 'rgba(74, 222, 128, 0.1)';
+                    statusMsg.style.color = 'var(--success)';
+                } else {
+                    statusMsg.innerText = 'Connection Failed: ' + res.error;
+                    statusMsg.style.background = 'rgba(248, 113, 113, 0.1)';
+                    statusMsg.style.color = 'var(--error)';
+                }
+            } catch (err) {
+                clearTimeout(safetyTimeout);
+                statusMsg.innerText = 'Bridge Error: ' + err.message;
+                statusMsg.style.background = 'rgba(248, 113, 113, 0.1)';
+                statusMsg.style.color = 'var(--error)';
+            }
+        }
+
+        document.getElementById('btn-test-openrouter').onclick = (e) => { e.preventDefault(); testConnection(); };
+        document.getElementById('btn-test-ollama').onclick = (e) => { e.preventDefault(); testConnection(); };
+
+        async function clearAllData() {
+            if (confirm('DANGER: This will delete everything. Proceed?')) {
+                await sendIPC('history.clear');
+                await sendIPC('bookmarks.clear');
+                alert('Data cleared.');
+            }
+        }
+
+        loadSettings();
+    </script>
+</body>
+</html>

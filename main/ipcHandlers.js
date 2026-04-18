@@ -6,7 +6,7 @@
  * or ipcMain.on (fire-and-forget with event.sender.send for responses).
  */
 
-const { ipcMain } = require('electron');
+const { ipcMain, shell } = require('electron');
 const {
   getSettings, saveSettings,
   getNotes, saveNote, deleteNote,
@@ -49,32 +49,7 @@ module.exports = function registerIpcHandlers() {
   });
 
   // ─── Settings ──────────────────────────────────────────────────────────────
-
-  ipcMain.handle('settings:get', () => ({ ...getSettings(), ...getPreferences() }));
-
-  ipcMain.handle('settings:save', (_, settings) => {
-    saveSettings(settings);
-    savePreferences(settings);
-    return { success: true };
-  });
-
-  ipcMain.handle('settings:fetch-models', async () => {
-    const settings = getSettings();
-    try {
-      if (settings.provider === 'openrouter') {
-        const models = await fetchOpenRouterModels(settings.openrouterApiKey);
-        return { success: true, models };
-      } else if (settings.provider === 'pollinations') {
-        const models = await fetchPollinationsModels();
-        return { success: true, models };
-      } else {
-        const models = await fetchOllamaModels(settings.ollamaBaseUrl);
-        return { success: true, models };
-      }
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  });
+  // (Migrated to SettingsService)
 
   // ─── LLM Chat Streaming ───────────────────────────────────────────────────
 
@@ -137,15 +112,12 @@ module.exports = function registerIpcHandlers() {
   // ─── Agents ────────────────────────────────────────────────────────────────
 
   ipcMain.handle('agents:get', () => getAgents());
-
   ipcMain.handle('agents:save', (_, agent) => saveAgent(agent));
-
   ipcMain.handle('agents:delete', (_, agentId) => deleteAgent(agentId));
 
   ipcMain.on('agent:run', (event, { agentId, goal, tabId, model }) => {
-    // Stop any existing run for this agent
     if (runningAgents.has(agentId)) {
-      runningAgents.get(agentId)();
+      runningAgents.get(agentId).abort();
     }
 
     const agents = getAgents();
@@ -156,9 +128,8 @@ module.exports = function registerIpcHandlers() {
     }
 
     const settings = getSettings();
-    const targetModel = model || agent.model; // Use passed model or agent's saved one
+    const targetModel = model || agent.model;
 
-    // Define browser actions for the agent
     const browserActions = {
       getSnapshot: async () => {
         return new Promise((resolve) => {
@@ -183,10 +154,22 @@ module.exports = function registerIpcHandlers() {
       navigate: async (url) => {
         event.sender.send('tab:open-url', url);
         return { success: true };
+      },
+      closeTabs: async (direction) => {
+        event.sender.send('tab:close-tabs-command', direction);
+        return { success: true };
+      },
+      bookmark: async () => {
+        event.sender.send('tab:bookmark-command');
+        return { success: true };
+      },
+      setTheme: async (mode) => {
+        event.sender.send('settings:set-theme-command', mode);
+        return { success: true };
       }
     };
 
-    const abort = runAgent({
+    const runnerConfig = runAgent({
       agentId,
       agentName: agent.name,
       agentDescription: agent.description,
@@ -207,51 +190,86 @@ module.exports = function registerIpcHandlers() {
       },
     });
 
-    runningAgents.set(agentId, abort);
+    runningAgents.set(agentId, runnerConfig);
   });
 
   ipcMain.handle('agent:stop', (_, agentId) => {
     if (runningAgents.has(agentId)) {
-      runningAgents.get(agentId)();
+      runningAgents.get(agentId).abort();
       runningAgents.delete(agentId);
     }
     return { success: true };
   });
 
+  ipcMain.on('agent:send-instruction', (event, { agentId, text }) => {
+    if (runningAgents.has(agentId)) {
+      runningAgents.get(agentId).sendInstruction(text);
+    }
+  });
+
   // ─── Notes ─────────────────────────────────────────────────────────────────
 
   ipcMain.handle('notes:get', () => getNotes());
-
   ipcMain.handle('notes:save', (_, note) => saveNote(note));
-
   ipcMain.handle('notes:delete', (_, noteId) => deleteNote(noteId));
 
-  // ─── Bookmarks ─────────────────────────────────────────────────────────────
+  // ─── Bookmarks & History ───────────────────────────────────────────────────
+  // (Migrated to respective Service classes in the Platform Hub)
 
-  ipcMain.handle('bookmarks:get', () => getBookmarks());
+  // ─── Native UI Menus ────────────────────────────────────────────────────────
 
-  ipcMain.handle('bookmarks:add', (_, bookmark) => addBookmark(bookmark));
+  ipcMain.on('tab:show-context-menu', (event, params) => {
+    const { Menu, clipboard, BrowserWindow } = require('electron');
+    const { x, y, linkURL, srcURL, mediaType, pageURL, selectionText } = params;
 
-  ipcMain.handle('bookmarks:remove', (_, bookmarkId) => removeBookmark(bookmarkId));
+    const template = [];
 
-  // ─── History ───────────────────────────────────────────────────────────────
+    if (linkURL) {
+      template.push({
+        label: 'Open Link in New Tab',
+        click: () => event.sender.send('tab:open-new-tab', linkURL)
+      });
+      template.push({
+        label: 'Copy Link Address',
+        click: () => clipboard.writeText(linkURL)
+      });
+      template.push({ type: 'separator' });
+    }
 
-  ipcMain.handle('history:get', () => getHistory());
+    if (srcURL && mediaType === 'image') {
+      template.push({
+        label: 'Copy Image Address',
+        click: () => clipboard.writeText(srcURL)
+      });
+      template.push({ type: 'separator' });
+    }
 
-  ipcMain.handle('history:add', (_, entry) => {
-    addToHistory(entry);
-    return { success: true };
-  });
+    if (selectionText) {
+      template.push({
+        label: 'Copy',
+        role: 'copy',
+        click: () => clipboard.writeText(selectionText)
+      });
+      template.push({ type: 'separator' });
+    }
 
-  ipcMain.handle('history:clear', () => {
-    clearHistory();
-    return { success: true };
+    template.push(
+      { label: 'Back', click: () => event.sender.send('tab:menu-action', 'back') },
+      { label: 'Forward', click: () => event.sender.send('tab:menu-action', 'forward') },
+      { label: 'Reload', click: () => event.sender.send('tab:menu-action', 'reload') },
+      { type: 'separator' },
+      { label: 'Inspect Element', click: () => event.sender.send('tab:menu-action', { action: 'inspect', x, y }) }
+    );
+
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) {
+      Menu.buildFromTemplate(template).popup({ window });
+    }
   });
 
   // ─── Browser Automation ──────────────────────────────────────────
 
   ipcMain.handle('tab:get-snapshot', async (event) => {
-    // We send an event to the renderer and wait for the reply
     return new Promise((resolve) => {
       const timeout = setTimeout(() => resolve({ success: false, error: 'Snapshot timed out' }), 5000);
       ipcMain.once('tab:snapshot-result', (_, result) => {

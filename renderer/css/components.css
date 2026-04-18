@@ -200,6 +200,24 @@ select.input option {
   transform: translateY(-50%);
   color: var(--text-muted);
 }
+#chat-context-btn.active {
+  background: var(--brand-primary) !important;
+  color: white !important;
+  animation: brain-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  box-shadow: 0 0 10px var(--brand-glow), inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+@keyframes brain-pulse {
+  0% { transform: scale(1); box-shadow: 0 0 5px var(--brand-glow); }
+  50% { transform: scale(1.1); box-shadow: 0 0 20px var(--brand-glow); }
+  100% { transform: scale(1); box-shadow: 0 0 5px var(--brand-glow); }
+}
+
+#chat-context-btn.active svg {
+  transform: scale(1.1);
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
 .input-with-icon__icon svg { width: 16px; height: 16px; }
 
 .textarea {

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Nexus — New Tab</title>
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/layout.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/animations.css">
+  <style>
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+      font-family: var(--font-sans);
+    }
+
+    .hero {
+      text-align: center;
+      animation: fade-in-up 0.8s var(--ease-out);
+    }
+
+    .hero__logo {
+      width: 80px;
+      height: 80px;
+      margin-bottom: var(--space-6);
+      filter: drop-shadow(0 0 20px var(--accent-glow));
+      animation: float 6s ease-in-out infinite;
+    }
+
+    .hero__title {
+      font-size: var(--text-4xl);
+      font-weight: 800;
+      margin-bottom: var(--space-2);
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #fff 0%, var(--text-secondary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero__subtitle {
+      color: var(--text-muted);
+      font-size: var(--text-lg);
+      margin-bottom: var(--space-12);
+    }
+
+    .search-container {
+      width: 100%;
+      max-width: 600px;
+      position: relative;
+      animation: fade-in-up 1s var(--ease-out) 0.2s both;
+    }
+
+    .search-bar {
+      width: 100%;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-xl);
+      padding: var(--space-5) var(--space-6);
+      padding-left: 54px;
+      font-size: var(--text-lg);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-lg);
+      transition: all 0.3s var(--ease-out);
+      outline: none;
+    }
+
+    .search-bar:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-subtle), var(--shadow-xl);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: var(--space-6);
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+    }
+
+    .shortcuts {
+      margin-top: var(--space-16);
+      display: flex;
+      gap: var(--space-8);
+      animation: fade-in-up 1.2s var(--ease-out) 0.4s both;
+    }
+
+    .shortcut {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-3);
+      text-decoration: none;
+      color: var(--text-muted);
+      transition: all 0.2s ease;
+      width: 80px;
+    }
+
+    .shortcut:hover {
+      color: var(--text-primary);
+      transform: translateY(-4px);
+    }
+
+    .shortcut__icon {
+      width: 48px;
+      height: 48px;
+      background: var(--bg-elevated);
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      transition: all 0.2s ease;
+    }
+
+    .shortcut:hover .shortcut__icon {
+      border-color: var(--accent);
+      background: var(--bg-surface);
+      box-shadow: var(--shadow-accent);
+      color: var(--accent);
+    }
+
+    .shortcut__label {
+      font-size: var(--text-sm);
+      font-weight: 500;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <div class="hero__logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:100%; height:100%;">
+        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+        <polyline points="2 17 12 22 22 17"></polyline>
+        <polyline points="2 12 12 17 22 12"></polyline>
+      </svg>
+    </div>
+    <h1 class="hero__title">Beyond Browsing.</h1>
+    <p class="hero__subtitle">Agent-driven internet, securely integrated.</p>
+  </div>
+
+  <div class="search-container">
+    <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+    <input type="text" class="search-bar" id="omnibox" placeholder="Search the web or ask AI..." autofocus>
+  </div>
+
+  <div class="shortcuts">
+    <a href="https://google.com" class="shortcut">
+      <div class="shortcut__icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+      </div>
+      <span class="shortcut__label">Google</span>
+    </a>
+    <a href="https://github.com" class="shortcut">
+      <div class="shortcut__icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+      </div>
+      <span class="shortcut__label">GitHub</span>
+    </a>
+    <a href="nexus://settings" class="shortcut">
+      <div class="shortcut__icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </div>
+      <span class="shortcut__label">Settings</span>
+    </a>
+  </div>
+
+  <script>
+    const input = document.getElementById('omnibox');
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const query = input.value.trim();
+        if (query) {
+          // Send to main process or handle here
+          console.log('Searching for:', query);
+          // Standard web search fallback
+          window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+        }
+      }
+    });
+  </script>
+</body>
+</html>

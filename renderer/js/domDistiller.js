@@ -11,6 +11,9 @@
     const interactiveElements = [];
     const selector = 'button, a, input, select, textarea, [role="button"], [role="link"], [role="checkbox"], [role="menuitem"]';
     
+    // Clear old visual tags
+    document.querySelectorAll('.nexus-ai-tag').forEach(tag => tag.remove());
+    
     // Assign unique IDs and collect data
     const elements = document.querySelectorAll(selector);
     elements.forEach((el, index) => {
@@ -22,6 +25,28 @@
 
       const id = `nx-${index}`;
       el.setAttribute('data-nexus-id', id);
+
+      // Render Visual Bounding Tag for VLM
+      const tagEl = document.createElement('div');
+      tagEl.className = 'nexus-ai-tag';
+      tagEl.innerText = id;
+      tagEl.style.cssText = `
+        position: absolute;
+        top: ${Math.max(0, rect.top + window.scrollY)}px;
+        left: ${Math.max(0, rect.left + window.scrollX)}px;
+        background-color: #ffeb3b; /* high visibility */
+        color: #000;
+        font-size: 11px;
+        font-family: monospace;
+        font-weight: bold;
+        padding: 2px 4px;
+        border: 1px solid #000;
+        border-radius: 3px;
+        z-index: 2147483647;
+        pointer-events: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      `;
+      document.body.appendChild(tagEl);
 
       interactiveElements.push({
         id: id,

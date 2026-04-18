@@ -1,8 +1,28 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, shell, dialog, session } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, session, protocol } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
+
+// Register privileged schemes before app is ready
+protocol.registerSchemesAsPrivileged([
+  { 
+    scheme: 'nexus', 
+    privileges: { 
+      standard: true, 
+      secure: true, 
+      supportFetchAPI: true, 
+      allowServiceWorkers: true 
+    } 
+  }
+]);
+
+const hub = require('./platform/Hub');
+const HistoryService = require('./platform/HistoryService');
+const SettingsService = require('./platform/SettingsService');
+const BookmarkService = require('./platform/BookmarkService');
+const DownloadService = require('./platform/DownloadService');
+const ShieldsService = require('./platform/ShieldsService');
 
 // Keep references to prevent garbage collection
 let mainWindow = null;
@@ -18,6 +38,14 @@ const isDev = process.argv.includes('--dev');
 // ─── App Initialization ──────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
+  // Register and initialize Platform Hub services
+  hub.registerService('history', HistoryService);
+  hub.registerService('settings', SettingsService);
+  hub.registerService('bookmarks', BookmarkService);
+  hub.registerService('downloads', DownloadService);
+  hub.registerService('shields', ShieldsService);
+  await hub.init();
+
   // Register IPC handlers after app is ready
   require('./ipcHandlers')();
 
@@ -132,8 +160,8 @@ function createMainWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
-      preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       webviewTag: true,
+      preload: path.join(__dirname, '..', 'preload', 'preload.js'),
     },
     icon: path.join(__dirname, '..', 'assets', 'icons', 'icon.png'),
   });

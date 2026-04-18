@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Downloads - Nexus</title>
+    <link rel="stylesheet" href="../css/base.css">
+    <link rel="stylesheet" href="../css/layout.css">
+    <link rel="stylesheet" href="../css/components.css">
+    <style>
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+            animation: fade-in 0.4s ease-out;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .download-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .download-item {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+        .item-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--bg-crust);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent);
+        }
+        .item-main {
+            min-width: 0;
+        }
+        .item-name {
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .item-info {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: flex;
+            gap: 16px;
+        }
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background: var(--accent);
+            transition: width 0.3s ease;
+        }
+        .item-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 100px 0;
+            color: var(--text-muted);
+        }
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .status-downloading { background: rgba(124, 77, 255, 0.2); color: var(--accent); }
+        .status-completed { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+        .status-failed { background: rgba(239, 68, 68, 0.2); color: var(--error); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Downloads
+        </h1>
+        <button class="btn btn-ghost" onclick="clearDownloads()">Clear List</button>
+    </div>
+
+    <div id="download-list" class="download-list">
+        <!-- Downloads will be injected here -->
+    </div>
+
+    <script>
+        const { nexus } = window;
+        const listContainer = document.getElementById('download-list');
+        let downloads = [];
+
+        async function load() {
+            downloads = await nexus.downloads.get();
+            render();
+        }
+
+        function render() {
+            if (downloads.length === 0) {
+                listContainer.innerHTML = '<div class="empty-state">No downloads found in this session.</div>';
+                return;
+            }
+
+            listContainer.innerHTML = downloads.slice().reverse().map(dl => {
+                const percent = dl.total > 0 ? Math.round((dl.received / dl.total) * 100) : 0;
+                const sizeStr = dl.total > 0 ? (dl.total / (1024 * 1024)).toFixed(1) + ' MB' : 'Unknown size';
+                
+                return `
+                    <div class="download-item">
+                        <div class="item-icon">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                        </div>
+                        <div class="item-main">
+                            <div class="item-name">${dl.name}</div>
+                            <div class="item-info">
+                                <span class="status-badge status-${dl.status}">${dl.status}</span>
+                                <span>${percent}% of ${sizeStr}</span>
+                            </div>
+                        </div>
+                        <div class="item-actions">
+                            ${dl.status === 'completed' ? `<button class="btn btn-ghost" onclick="nexus.downloads.open('${dl.id}')">Show in Folder</button>` : ''}
+                        </div>
+                        <div class="progress-bar" style="width: ${percent}%"></div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        nexus.downloads.onUpdate((data) => {
+            const idx = downloads.findIndex(d => d.id === data.id);
+            if (idx > -1) downloads[idx] = data;
+            else downloads.push(data);
+            render();
+        });
+
+        async function clearDownloads() {
+            await nexus.downloads.clear();
+            downloads = [];
+            render();
+        }
+
+        load();
+    </script>
+</body>
+</html>

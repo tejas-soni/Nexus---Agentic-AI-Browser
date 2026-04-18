@@ -51,11 +51,16 @@ function getTools(browserActions) {
         const result = await browserActions.getSnapshot();
         if (!result.success) return `Failed to read page: ${result.error}`;
         
-        const { title, url, summary, elements } = result.snapshot;
+        const { title, url, summary, elements, image } = result.snapshot;
         let output = `Currently on: ${title} (${url})\n\nPage Summary: ${summary}\n\nInteractive Elements:\n`;
         elements.forEach(el => {
           output += `- [${el.id}] ${el.tag}${el.role ? ` (role: ${el.role})` : ''}: "${el.text}"\n`;
         });
+        
+        const isVisionModel = (model || '').toLowerCase().match(/vision|vlm|claude-3|gemini-1\.5|gpt-4o|pixtral|llava/);
+        if (image && isVisionModel) {
+          return { type: 'multimodal', text: output, image_url: image };
+        }
         return output;
       }
     },
@@ -76,7 +81,7 @@ function getTools(browserActions) {
       execute: async (input) => {
         if (!browserActions?.interact) return 'Browser control not available.';
         try {
-          const { id, text } = JSON.parse(input);
+          const { id, text } = typeof input === 'string' ? JSON.parse(input) : input;
           const result = await browserActions.interact('type', { id, text });
           return result.success ? `Successfully typed into ${id}.` : `Failed to type: ${result.error || 'element not found'}`;
         } catch {
@@ -102,6 +107,36 @@ function getTools(browserActions) {
         if (!browserActions?.navigate) return 'Navigation not available.';
         await browserActions.navigate(url);
         return `Navigating to ${url}...`;
+      }
+    },
+    
+    close_tabs: {
+      name: 'close_tabs',
+      description: 'Close tabs in a specific direction. Input: "left", "right", or "other".',
+      execute: async (direction) => {
+        if (!browserActions?.closeTabs) return 'Tab control not available.';
+        await browserActions.closeTabs(direction);
+        return `Request sent to close tabs: ${direction}.`;
+      }
+    },
+    
+    bookmark_current: {
+      name: 'bookmark_current',
+      description: 'Add the current page to bookmarks.',
+      execute: async () => {
+        if (!browserActions?.bookmark) return 'Bookmark action not available.';
+        await browserActions.bookmark();
+        return 'Bookmark request sent.';
+      }
+    },
+    
+    set_theme: {
+      name: 'set_theme',
+      description: 'Change the browser theme. Input: "dark" or "light".',
+      execute: async (mode) => {
+        if (!browserActions?.setTheme) return 'Theme control not available.';
+        await browserActions.setTheme(mode);
+        return `Theme changed to ${mode}.`;
       }
     },
 
@@ -216,7 +251,7 @@ function runAgent({ agentId, agentName, agentDescription, task, model, settings,
       onChunk: (chunk) => {
         if (aborted) return;
         responseText += chunk;
-        onStep({ type: 'stream', content: chunk });
+        // Suppress raw stream events so UI doesn't get flooded with JSON brackets
       },
       onDone: async () => {
         if (aborted) return;
@@ -232,7 +267,22 @@ function runAgent({ agentId, agentName, agentDescription, task, model, settings,
 
         const { thought, tool: toolName, input } = parsed;
         onStep({ type: 'thought', content: thought });
-        onStep({ type: 'tool_call', content: `Using: ${toolName}(${input || ''})` });
+
+        let readableInput = typeof input === 'string' ? input : JSON.stringify(input);
+        try {
+            if (typeof input === 'object' && toolName === 'type_text') {
+                readableInput = `typing "${input.text}" into element [${input.id}]`;
+            } else if (typeof input === 'string' && input.trim().startsWith('{')) {
+                const p = JSON.parse(input);
+                if (toolName === 'type_text') {
+                    readableInput = `typing "${p.text}" into element [${p.id}]`;
+                } else {
+                    readableInput = JSON.stringify(p, null, 2);
+                }
+            }
+        } catch (_) {}
+        
+        onStep({ type: 'tool_call', content: `Using: ${toolName}(${readableInput})` });
 
         const tool = TOOLS[toolName];
         if (!tool) {
@@ -245,21 +295,34 @@ function runAgent({ agentId, agentName, agentDescription, task, model, settings,
 
         try {
           const observation = await tool.execute(input);
-          onStep({ type: 'observation', content: observation });
+          
+          let obsContent;
+          if (observation && observation.type === 'multimodal') {
+             obsContent = [
+                 { type: 'text', text: `Observation: ${observation.text}\n(Project Progress: Step ${stepCount} of ${MAX_STEPS})` },
+                 { type: 'image_url', image_url: { url: observation.image_url } }
+             ];
+             onStep({ type: 'observation', content: observation.text + "\n\n[👁️ Visual Screenshot Included for Evaluation]" });
+          } else {
+             obsContent = `Observation: ${observation}\n(Project Progress: Step ${stepCount} of ${MAX_STEPS})`;
+             onStep({ type: 'observation', content: observation });
+          }
 
           if (toolName === 'report') {
             onStep({ type: 'result', content: observation });
-            onDone();
+            // Drop out of the automatic step loop to pause execution
+            currentRequest = null;
             return;
           }
 
           if (toolName === 'take_note') onStep({ type: 'note', content: input });
           if (toolName === 'generate_image') {
-            const urlMatch = observation.match(/https?:\/\/\S+/);
+            const strObs = typeof observation === 'string' ? observation : observation.text;
+            const urlMatch = (strObs || '').match(/https?:\/\/\S+/);
             if (urlMatch) onStep({ type: 'image', content: urlMatch[0] });
           }
 
-          messages.push({ role: 'assistant', content: responseText }, { role: 'user', content: `Observation: ${observation}\n(Project Progress: Step ${stepCount} of ${MAX_STEPS})` });
+          messages.push({ role: 'assistant', content: responseText }, { role: 'user', content: obsContent });
           executeNextStep();
         } catch (err) {
           onStep({ type: 'error', content: `Tool error: ${err.message}` });
@@ -273,10 +336,25 @@ function runAgent({ agentId, agentName, agentDescription, task, model, settings,
 
   executeNextStep();
 
-  return function abort() {
-    aborted = true;
-    if (currentRequest?.destroy) currentRequest.destroy();
-    onStep({ type: 'abort', content: 'Agent was stopped.' });
+  return {
+    abort: () => {
+      aborted = true;
+      if (typeof currentRequest === 'function') currentRequest();
+      else if (currentRequest?.destroy) currentRequest.destroy();
+      onStep({ type: 'abort', content: 'Agent was stopped.' });
+    },
+    sendInstruction: (text) => {
+      // Abort active stream request to intercept gracefully
+      if (typeof currentRequest === 'function') currentRequest();
+      else if (currentRequest?.destroy) currentRequest.destroy();
+      currentRequest = null;
+      
+      onStep({ type: 'info', content: `[User Interaction]: ${text}` });
+      messages.push({ role: 'user', content: `CRITICAL INSTRUCTION FROM USER: ${text}` });
+      
+      // Immediately loop the agent with the new context
+      executeNextStep();
+    }
   };
 }
 

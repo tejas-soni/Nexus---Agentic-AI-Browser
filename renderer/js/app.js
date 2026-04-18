@@ -28,22 +28,68 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let availableModels = [];
 
-    async function loadAvailableModels() {
+    async function loadAvailableModels(retryCount = 0) {
         const chatModelSelect = document.getElementById('chat-model-select');
-        if (chatModelSelect) chatModelSelect.innerHTML = '<option value="">Fetching brains...</option>';
         
-        const res = await window.nexus.settings.fetchModels();
-        if (res.success) {
-            availableModels = res.models;
-            if (chatModelSelect) {
-                chatModelSelect.innerHTML = availableModels.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+        // Initial feedback for the user
+        if (chatModelSelect && (chatModelSelect.innerHTML.includes('Loading models...') || chatModelSelect.innerHTML.includes('Fetching brains...'))) {
+            chatModelSelect.innerHTML = '<option value="">Connecting to AI Provider...</option>';
+        }
+        
+        try {
+            const res = await window.nexus.settings.fetchModels();
+            if (res.success && res.models && res.models.length > 0) {
+                availableModels = res.models;
+                if (chatModelSelect) {
+                    const savedSettings = await window.nexus.settings.get();
+                    const provider = savedSettings.provider || 'openrouter';
+                    const targetModel = provider === 'openrouter' ? savedSettings.openrouterModel : (provider === 'ollama' ? savedSettings.ollamaModel : savedSettings.pollinationsModel);
+                    
+                    chatModelSelect.innerHTML = availableModels.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+                    
+                    // Restore previously selected model
+                    if (targetModel && availableModels.some(m => m.id === targetModel)) {
+                        chatModelSelect.value = targetModel;
+                    }
+                }
+            } else {
+                console.warn('[NEXUS:UI] Model fetch failed:', res.error);
+                if (retryCount < 3) {
+                    // Gradual backoff to allow network stability
+                    const delay = 2000 * (retryCount + 1);
+                    console.log(`[NEXUS:UI] Retrying connection in ${delay}ms... (Attempt ${retryCount + 1})`);
+                    setTimeout(() => loadAvailableModels(retryCount + 1), delay);
+                } else if (chatModelSelect && chatModelSelect.value === "") {
+                    chatModelSelect.innerHTML = `<option value="">Offline: Check Settings</option>`;
+                }
             }
-        } else {
-            console.error('[NEXUS:UI] Model fetch failed:', res.error);
-            if (chatModelSelect) chatModelSelect.innerHTML = '<option value="">Provider disconnected</option>';
+        } catch (err) {
+            console.error('[NEXUS:UI] Critical error during model fetch:', err);
         }
     }
     window.loadNexusModels = loadAvailableModels;
+    
+    // Save model selection when user changes it
+    const chatModelSelect = document.getElementById('chat-model-select');
+    if (chatModelSelect) {
+        chatModelSelect.addEventListener('change', async (e) => {
+            const settings = await window.nexus.settings.get();
+            const provider = settings.provider || 'openrouter';
+            if (provider === 'openrouter') settings.openrouterModel = e.target.value;
+            else if (provider === 'ollama') settings.ollamaModel = e.target.value;
+            else if (provider === 'pollinations') settings.pollinationsModel = e.target.value;
+            await window.nexus.settings.save(settings);
+            console.log(`[NEXUS:UI] Model selection saved natively.`);
+        });
+    }
+    
+    // Refresh models when settings change
+    window.nexus.settings.onUpdated(() => {
+        console.log('[NEXUS:UI] Settings updated. Refreshing models...');
+        loadAvailableModels();
+        if (window.loadAgents) window.loadAgents(); // Refresh personality icons/data
+    });
+
 
     // ─── OVERKILL STABILITY FIX: Global Agent/Note Handlers ──────
     // This catches clicks for ALL dynamic elements even after re-renders.
@@ -61,6 +107,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             handleRunAgent(btn.getAttribute('data-id'));
         } else if (btn.classList.contains('btn-stop')) {
             handleStopAgent(btn.getAttribute('data-id'));
+        } else if (btn.classList.contains('btn-instruct')) {
+            handleInstructAgent(btn.getAttribute('data-id'));
         } else if (btn.classList.contains('btn-edit')) {
             handleEditAgent(btn.getAttribute('data-id'));
         } else if (btn.classList.contains('btn-delete')) {
@@ -70,6 +118,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         // --- Notes ---
         if (btn.id === 'btn-new-note') {
             if (typeof window.editNote === 'function') window.editNote(null);
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.target.id?.startsWith('instruct-input-')) {
+            e.preventDefault();
+            handleInstructAgent(e.target.id.replace('instruct-input-', ''));
         }
     });
 
@@ -84,6 +139,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnBack: document.getElementById('btn-back'),
         btnForward: document.getElementById('btn-forward'),
         btnReload: document.getElementById('btn-reload'),
+        btnShields: document.getElementById('btn-shields'),
+        shieldsPopup: document.getElementById('shields-popup'),
+        shieldsDomain: document.getElementById('shields-domain'),
+        shieldCount: document.getElementById('shield-count'),
+        toggleShieldsOn: document.getElementById('toggle-shields-on'),
+        toggleHttpsUpgrade: document.getElementById('toggle-https-upgrade'),
+        toggleFingerprinting: document.getElementById('toggle-fingerprinting'),
         webviewContainer: document.getElementById('webview-container'),
         newTabPage: document.getElementById('newtab-page'),
         newTabSearch: document.getElementById('newtab-search'),
@@ -94,6 +156,86 @@ document.addEventListener('DOMContentLoaded', async () => {
         closeBtns: document.querySelectorAll('.panel-header__close'),
         toastContainer: document.getElementById('toast-container')
     };
+
+    // ─── Nexus Shields Logic ──────────────────────────────────────
+    let blockedStats = { total: 0 };
+
+    function getActiveDomain() {
+        const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+        if (!activeTab || !activeTab.url) return 'newtab';
+        try {
+            const url = new URL(activeTab.url);
+            return url.hostname;
+        } catch {
+            return activeTab.url;
+        }
+    }
+
+    async function updateShieldsUI() {
+        const domain = getActiveDomain();
+        elements.shieldsDomain.innerText = domain;
+        
+        // Load persistency
+        const config = await window.nexus.shields.getConfig(domain);
+        elements.toggleShieldsOn.checked = config.enabled !== false;
+        elements.toggleHttpsUpgrade.checked = config.httpsUpgrade !== false;
+        elements.toggleFingerprinting.checked = config.fingerprinting !== false;
+
+        // Load stats
+        const stats = await window.nexus.shields.getStats();
+        elements.shieldCount.innerText = stats.blockedCount || 0;
+    }
+
+    async function toggleShieldsDropdown() {
+        const isHidden = elements.shieldsPopup.classList.contains('hidden');
+        if (isHidden) {
+            await updateShieldsUI();
+            elements.shieldsPopup.classList.remove('hidden');
+        } else {
+            elements.shieldsPopup.classList.add('hidden');
+        }
+    }
+
+    elements.btnShields.onclick = (e) => {
+        e.stopPropagation();
+        toggleShieldsDropdown();
+    };
+
+    // Auto-save changes
+    const saveShieldConfig = async () => {
+        const domain = getActiveDomain();
+        const config = {
+            enabled: elements.toggleShieldsOn.checked,
+            httpsUpgrade: elements.toggleHttpsUpgrade.checked,
+            fingerprinting: elements.toggleFingerprinting.checked
+        };
+        await window.nexus.shields.saveConfig(domain, config);
+        
+        // Reload current tab to apply blocking/unblocking immediately
+        const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+        if (activeTab && activeTab.webview) {
+            activeTab.webview.reload();
+        }
+    };
+
+    elements.toggleShieldsOn.onchange = saveShieldConfig;
+    elements.toggleHttpsUpgrade.onchange = saveShieldConfig;
+    elements.toggleFingerprinting.onchange = saveShieldConfig;
+
+    // Listen for real-time blocking events
+    window.nexus.shields.onStatsUpdate((data) => {
+        elements.shieldCount.innerText = data.total;
+        // Subtle glow effect on shield icon when blocking occurs
+        elements.btnShields.style.color = 'var(--accent)';
+        setTimeout(() => { elements.btnShields.style.color = ''; }, 500);
+    });
+
+    // Close popup on click outside
+    document.addEventListener('click', (e) => {
+        if (!elements.shieldsPopup.contains(e.target) && e.target !== elements.btnShields) {
+            elements.shieldsPopup.classList.add('hidden');
+        }
+    });
 
     // ─── Utilities ────────────────────────────────────────────────
     
@@ -204,9 +346,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     elements.navItems.forEach(item => {
         item.onclick = () => {
             const panel = item.getAttribute('data-panel');
-            if (panel === 'home') {
+            if (panel === 'home' || !panel) {
                 closeAllPanels();
                 showNewTabPage();
+            } else if (['settings', 'bookmarks', 'history', 'downloads'].includes(panel)) {
+                closeAllPanels();
+                navigateTo(`nexus://${panel}`);
             } else {
                 openPanel(panel);
             }
@@ -248,25 +393,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     function createTab(url = null) {
         const id = Date.now().toString();
-        const tab = { id, url: url || 'nexus://newtab', title: 'New Tab', loading: false, favicon: null };
+        const targetUrl = url || 'nexus://newtab';
+        const tab = { id, url: targetUrl, title: 'New Tab', loading: false, favicon: null };
         state.tabs.push(tab);
         renderTabs();
-        if (url && url !== 'nexus://newtab') {
-            const webview = document.createElement('webview');
-            webview.id = `webview-${id}`;
-            webview.src = url;
-            webview.setAttribute('allowpopups', '');
-            elements.webviewContainer.appendChild(webview);
-            setupWebviewEvents(webview, id);
-        }
+        
+        const webview = document.createElement('webview');
+        webview.id = `webview-${id}`;
+        webview.setAttribute('allowpopups', '');
+        
+        webview.src = targetUrl;
+        
+        elements.webviewContainer.appendChild(webview);
+        setupWebviewEvents(webview, id);
+        
         switchTab(id);
         return id;
     }
 
     function setupWebviewEvents(webview, tabId) {
-        webview.addEventListener('did-start-loading', () => {
+        webview.addEventListener('did-start-loading', async () => {
             const tab = state.tabs.find(t => t.id === tabId);
             if (tab) { tab.loading = true; renderTabs(); }
+            
+            // Inject Anti-Fingerprinting script if enabled for this domain
+            try {
+                const url = new URL(webview.getURL());
+                const config = await window.nexus.shields.getConfig(url.hostname);
+                if (config.fingerprinting !== false) {
+                    const script = await fetch('../preload/shields.js').then(r => r.text());
+                    webview.executeJavaScript(script);
+                }
+            } catch (e) {}
         });
         webview.addEventListener('did-stop-loading', () => {
             const tab = state.tabs.find(t => t.id === tabId);
@@ -290,7 +448,40 @@ document.addEventListener('DOMContentLoaded', async () => {
             const tab = state.tabs.find(t => t.id === tabId);
             if (tab) { tab.favicon = e.favicons[0]; renderTabs(); }
         });
-        webview.addEventListener('new-window', (e) => createTab(e.url));
+        webview.addEventListener('new-window', (e) => {
+            e.preventDefault();
+            createTab(e.url);
+        });
+        webview.addEventListener('context-menu', (e) => {
+            e.preventDefault();
+            window.nexus.tabs.sendContextMenu({
+                x: e.params.x,
+                y: e.params.y,
+                linkURL: e.params.linkURL,
+                srcURL: e.params.srcURL,
+                mediaType: e.params.mediaType,
+                pageURL: e.params.pageURL,
+                selectionText: e.params.selectionText
+            });
+        });
+        webview.addEventListener('console-message', async (e) => {
+            if (e.message.startsWith('NEXUS_IPC:')) {
+                try {
+                    const req = JSON.parse(e.message.replace('NEXUS_IPC:', ''));
+                    let res;
+                    if (req.action === 'settings.get') res = await window.nexus.settings.get();
+                    else if (req.action === 'settings.save') res = await window.nexus.settings.save(req.data);
+                    else if (req.action === 'settings.testConnection') res = await window.nexus.settings.testConnection();
+                    else if (req.action === 'history.clear') res = await window.nexus.history.clear();
+                    else if (req.action === 'bookmarks.clear') res = await window.nexus.bookmarks.clear();
+                    
+                    const safeRes = JSON.stringify(res || {}).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/'/g, "\\'");
+                    webview.executeJavaScript(`if(window._ipcCallbacks && window._ipcCallbacks["${req.reqId}"]) { window._ipcCallbacks["${req.reqId}"](JSON.parse('${safeRes}')); delete window._ipcCallbacks["${req.reqId}"]; }`).catch(console.error);
+                } catch (err) {
+                    console.error('[NEXUS:IPC-Tunnel] Error:', err);
+                }
+            }
+        });
     }
 
     function switchTab(id) {
@@ -299,16 +490,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderTabs();
         document.querySelectorAll('webview').forEach(wv => wv.style.display = 'none');
         elements.newTabPage.style.display = 'none';
-        if (tab.url === 'nexus://newtab') {
-            elements.newTabPage.style.display = 'flex';
-            elements.urlInput.value = '';
-        } else {
-            const webview = document.getElementById(`webview-${id}`);
-            if (webview) {
-                webview.style.display = 'flex';
-                elements.urlInput.value = webview.getURL();
-                updateNavButtons(webview);
-            }
+        
+        const webview = document.getElementById(`webview-${id}`);
+        if (webview) {
+            webview.style.display = 'flex';
+            elements.urlInput.value = tab.url === 'nexus://newtab' ? '' : tab.url;
+            updateNavButtons(webview);
         }
     }
 
@@ -342,13 +529,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function showNewTabPage() {
-        const tab = state.tabs.find(t => t.id === state.activeTabId);
-        if (tab) {
-            tab.url = 'nexus://newtab'; tab.title = 'New Tab'; tab.favicon = null;
-            const webview = document.getElementById(`webview-${tab.id}`);
-            if (webview) webview.remove();
-            switchTab(tab.id);
-        }
+        navigateTo('nexus://newtab');
     }
 
     // ─── Navigation Logic ─────────────────────────────────────────
@@ -364,7 +545,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         let webview = document.getElementById(`webview-${tab.id}`);
         if (!webview) {
             webview = document.createElement('webview');
-            webview.id = `webview-${tab.id}`; webview.setAttribute('allowpopups', '');
+            webview.id = `webview-${tab.id}`;
+            webview.setAttribute('allowpopups', '');
             elements.webviewContainer.appendChild(webview);
             setupWebviewEvents(webview, tab.id);
         }
@@ -380,16 +562,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (e.key === 'Enter') {
             let val = elements.urlInput.value.trim();
             if (!val) return;
-            if (!val.includes('://') && !val.startsWith('nexus://')) {
+            if (!val.includes('://') && !val.startsWith('nexus://') && !val.startsWith('about:')) {
                 if (val.includes('.') && !val.includes(' ')) val = 'https://' + val;
                 else val = 'https://www.google.com/search?q=' + encodeURIComponent(val);
             }
+            if (val.startsWith('about:')) val = 'nexus://' + val.substr(6);
             navigateTo(val);
         }
     };
 
     elements.btnNewTab.onclick = () => createTab();
-    window.nexus.tabs.onOpenUrl((url) => navigateTo(url));
+    window.nexus.tabs.onOpenUrl?.((url) => navigateTo(url));
+    window.nexus.tabs.onOpenNewTab?.((url) => createTab(url));
 
     // ─── Browser Automation Bridge ────────────────────────────────
     
@@ -400,7 +584,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         fetch('js/domDistiller.js').then(res => res.text()).then(script => {
-            webview.executeJavaScript(script).then(result => { window.nexus.tabs.sendSnapshotResult({ success: true, snapshot: result }); }).catch(err => { window.nexus.tabs.sendSnapshotResult({ success: false, error: err.message }); });
+            webview.executeJavaScript(script).then(result => {
+                // Ensure painting completes before capture
+                setTimeout(async () => {
+                    try {
+                        const image = await webview.capturePage();
+                        result.image = image.toDataURL(); // data:image/png;base64,...
+                        window.nexus.tabs.sendSnapshotResult({ success: true, snapshot: result });
+                    } catch (err) {
+                        console.error('Snapshot visual capture failed', err);
+                        window.nexus.tabs.sendSnapshotResult({ success: true, snapshot: result });
+                    }
+                }, 150); // slight delay to allow overlay boxes to render visually
+            }).catch(err => {
+                window.nexus.tabs.sendSnapshotResult({ success: false, error: err.message });
+            });
         });
     });
 
@@ -422,6 +620,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-minimize').onclick = () => window.nexus.window.minimize();
     document.getElementById('btn-maximize').onclick = () => window.nexus.window.maximize();
     document.getElementById('btn-close').onclick = () => window.nexus.window.close();
+
+    // ─── Native AI Browser Commands ───────────────────────────────
+    
+    window.nexus.tabs.onCloseTabsCommand?.((_, direction) => {
+        const activeIdx = state.tabs.findIndex(t => t.id === state.activeTabId);
+        if (activeIdx === -1) return;
+        
+        let toClose = [];
+        if (direction === 'right') toClose = state.tabs.slice(activeIdx + 1);
+        else if (direction === 'left') toClose = state.tabs.slice(0, activeIdx);
+        else if (direction === 'other') toClose = state.tabs.filter(t => t.id !== state.activeTabId);
+        
+        toClose.forEach(t => closeTab(t.id));
+        showToast(`AI closed tabs to the ${direction}`, 'info');
+    });
+
+    window.nexus.tabs.onBookmarkCommand?.(() => {
+        const tab = state.tabs.find(t => t.id === state.activeTabId);
+        if (tab && tab.url !== 'nexus://newtab') {
+            window.nexus.bookmarks.add({ title: tab.title, url: tab.url });
+            showToast('AI bookmarked this page', 'success');
+        }
+    });
+
+    window.nexus.settings.onSetThemeCommand?.((_, mode) => {
+        document.body.setAttribute('data-theme', mode); // Simple toggle
+        showToast(`AI set theme to ${mode}`, 'info');
+    });
 
     // ─── Initialization ───────────────────────────────────────────
     
@@ -447,8 +673,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initModule('Chat', initChat);
     initModule('Agents', initAgents);
     initModule('Notes', initNotes);
-    initModule('Settings', initSettings);
-    initModule('Bookmarks', initBookmarks);
+    // Settings and Bookmarks are now handled by the modular Platform Services and about: pages.
 
     // Initial Data Fetch
     setTimeout(() => {
@@ -465,11 +690,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         const send = document.getElementById('chat-send');
         const stopBtn = document.getElementById('chat-stop');
         const messagesEl = document.getElementById('chat-messages');
+        const contextBtn = document.getElementById('chat-context-btn');
         
         let sessionMessages = [];
         let activeChatId = null;
         let currentBubble = null;
         let currentStreamText = '';
+        let contextEnabled = false;
+
+        contextBtn.onclick = () => {
+            contextEnabled = !contextEnabled;
+            contextBtn.classList.toggle('active', contextEnabled);
+            contextBtn.style.color = contextEnabled ? 'var(--accent)' : 'var(--text-muted)';
+            contextBtn.style.background = contextEnabled ? 'var(--accent-subtle)' : 'transparent';
+            showToast(`AI Context Reading: ${contextEnabled ? 'ON' : 'OFF'}`, 'info');
+        };
 
         function addMessage(role, content) {
             const msg = document.createElement('div');
@@ -527,9 +762,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (stopBtn) stopBtn.classList.remove('hidden');
             if (send) send.classList.add('hidden');
 
-            const snap = await window.nexus.tabs.getSnapshot();
-            if (snap.success && snap.snapshot) {
-                sessionMessages.push({ role: 'system', content: `[User is viewing: ${snap.snapshot.title} at ${snap.snapshot.url}. Summary: ${snap.snapshot.summary}]` });
+            if (contextEnabled) {
+                const snap = await window.nexus.tabs.getSnapshot();
+                if (snap.success && snap.snapshot) {
+                    sessionMessages.push({ role: 'system', content: `CRITICAL CONTEXT: You are looking at the page "${snap.snapshot.title}". URL: ${snap.snapshot.url}. Here is the distilled summary of the page: ${snap.snapshot.summary}` });
+                    showToast('AI read page context...', 'info');
+                }
             }
             sessionMessages.push({ role: 'user', content: text });
 
@@ -566,7 +804,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <button class="btn btn-ghost btn-sm btn-edit" data-id="${a.id}">Edit</button>
                         <button class="btn btn-danger btn-sm btn-delete" data-id="${a.id}">Delete</button>
                     </div>
+                    </div>
                     <div class="agent-log hidden" id="log-${a.id}"></div>
+                    <div class="agent-interaction hidden" id="interaction-${a.id}" style="margin-top: 8px; display: flex; gap: 8px;">
+                        <input type="text" class="input" id="instruct-input-${a.id}" placeholder="Type instruction to instantly interrupt..." style="flex: 1; padding: 6px; font-size: 12px; background: rgba(0,0,0,0.2);" autocomplete="off">
+                        <button class="btn btn-primary btn-sm btn-instruct" data-id="${a.id}">Send</button>
+                    </div>
                 </div>
             `).join('');
         }
@@ -591,9 +834,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             const card = document.getElementById(`agent-${agentId}`);
             const stopBtn = document.getElementById(`stop-${agentId}`);
             const runBtn = card?.querySelector('.btn-run');
+            const interaction = document.getElementById(`interaction-${agentId}`);
             if (card) card.classList.remove('running');
             if (stopBtn) stopBtn.classList.add('hidden');
             if (runBtn) runBtn.classList.remove('hidden');
+            if (interaction) interaction.classList.add('hidden');
         });
 
         window.nexus.agents.onError(({ agentId, error }) => {
@@ -601,9 +846,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             const card = document.getElementById(`agent-${agentId}`);
             const stopBtn = document.getElementById(`stop-${agentId}`);
             const runBtn = card?.querySelector('.btn-run');
+            const interaction = document.getElementById(`interaction-${agentId}`);
             if (card) card.classList.remove('running');
             if (stopBtn) stopBtn.classList.add('hidden');
             if (runBtn) runBtn.classList.remove('hidden');
+            if (interaction) interaction.classList.add('hidden');
         });
 
         load();
@@ -655,6 +902,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const card = document.getElementById(`agent-${id}`);
         const stopBtn = document.getElementById(`stop-${id}`);
         const runBtn = card?.querySelector('.btn-run');
+        const interaction = document.getElementById(`interaction-${id}`);
         if (card) {
             card.classList.add('running');
             const log = document.getElementById(`log-${id}`);
@@ -662,6 +910,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (stopBtn) stopBtn.classList.remove('hidden');
         if (runBtn) runBtn.classList.add('hidden');
+        if (interaction) {
+            interaction.classList.remove('hidden');
+            document.getElementById(`instruct-input-${id}`).focus();
+        }
 
         showToast(`Agent ${agent.name} started running...`, 'success');
         window.nexus.agents.run({ agentId: id, goal: task, tabId: null, model: model });
@@ -672,10 +924,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         const card = document.getElementById(`agent-${id}`);
         const stopBtn = document.getElementById(`stop-${id}`);
         const runBtn = card?.querySelector('.btn-run');
+        const interaction = document.getElementById(`interaction-${id}`);
         if (card) card.classList.remove('running');
         if (stopBtn) stopBtn.classList.add('hidden');
         if (runBtn) runBtn.classList.remove('hidden');
+        if (interaction) interaction.classList.add('hidden');
         showToast('Agent stopped.', 'info');
+    }
+
+    function handleInstructAgent(id) {
+        const input = document.getElementById(`instruct-input-${id}`);
+        if (!input) return;
+        const text = input.value.trim();
+        if (!text) return;
+        
+        window.nexus.agents.sendInstruction(id, text);
+        input.value = '';
     }
 
     function initNotes() {
@@ -693,103 +957,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.loadNotes();
     }
 
-    async function initSettings() {
-        const body = document.getElementById('settings-body');
-        const s = await window.nexus.settings.get();
 
-        body.innerHTML = `
-            <div class="settings-form">
-                <div class="input-field">
-                    <label class="input-label">AI Provider</label>
-                    <select class="input" id="set-provider">
-                        <option value="openrouter" ${s.provider === 'openrouter' ? 'selected' : ''}>OpenRouter (Cloud)</option>
-                        <option value="ollama" ${s.provider === 'ollama' ? 'selected' : ''}>Ollama (Local)</option>
-                        <option value="pollinations" ${s.provider === 'pollinations' ? 'selected' : ''}>Pollinations (Free AI)</option>
-                    </select>
-                </div>
-                <div class="input-field provider-group provider-openrouter">
-                    <label class="input-label">OpenRouter API Key</label>
-                    <input class="input" type="password" id="set-openrouterApiKey" value="${s.openrouterApiKey || ''}" placeholder="sk-or-v1-...">
-                </div>
-                <div class="input-field provider-group provider-ollama">
-                    <label class="input-label">Ollama URL</label>
-                    <input class="input" type="text" id="set-ollamaBaseUrl" value="${s.ollamaBaseUrl || 'http://localhost:11434'}" placeholder="http://localhost:11434">
-                </div>
-                <div class="input-field provider-group provider-pollinations">
-                    <label class="input-label">Pollinations API Key (Optional)</label>
-                    <input class="input" type="password" id="set-pollinationsApiKey" value="${s.pollinationsApiKey || ''}" placeholder="Leave blank for free usage...">
-                    <small style="color:var(--text-muted);font-size:10px;margin-top:4px">Add an API key to increase your Pollinations Text AI request limits or bypass captchas.</small>
-                </div>
-                <div class="input-field">
-                    <label class="input-label">Response Timeout (Seconds)</label>
-                    <input class="input" type="number" id="set-timeout" value="${s.timeout || 300}" min="10" max="1800">
-                    <small style="color:var(--text-muted);font-size:10px;margin-top:4px">Increase this if your CPU is slow with local models. Default is 300s (5m).</small>
-                </div>
-                <div class="settings-actions" style="display:flex;gap:12px;margin-top:16px;">
-                    <button class="btn btn-ghost" id="btn-test-settings" style="flex:1">Test Connection</button>
-                    <button class="btn btn-primary" id="btn-save-settings" style="flex:2">Save Configuration</button>
-                </div>
-            </div>
-            <style>
-                .provider-group { display: none; }
-                .provider-openrouter { display: ${s.provider === 'openrouter' || !s.provider ? 'block' : 'none'}; }
-                .provider-ollama { display: ${s.provider === 'ollama' ? 'block' : 'none'}; }
-                .provider-pollinations { display: ${s.provider === 'pollinations' ? 'block' : 'none'}; }
-            </style>
-        `;
 
-        const providerSelect = body.querySelector('#set-provider');
-        providerSelect.addEventListener('change', (e) => {
-            const val = e.target.value;
-            body.querySelectorAll('.provider-group').forEach(el => el.style.display = 'none');
-            body.querySelectorAll('.provider-' + val).forEach(el => el.style.display = 'block');
-        });
 
-        const saveBtn = body.querySelector('#btn-save-settings');
-        const testBtn = body.querySelector('#btn-test-settings');
-
-        const getFormData = () => ({
-            provider: body.querySelector('#set-provider').value,
-            openrouterApiKey: body.querySelector('#set-openrouterApiKey').value,
-            ollamaBaseUrl: body.querySelector('#set-ollamaBaseUrl').value,
-            pollinationsApiKey: body.querySelector('#set-pollinationsApiKey').value,
-            timeout: parseInt(body.querySelector('#set-timeout').value)
-        });
-
-        testBtn.onclick = async () => {
-            testBtn.disabled = true;
-            testBtn.innerText = 'Testing...';
-            const current = getFormData();
-            
-            // Temporary save so backend uses these during fetch
-            await window.nexus.settings.save(current);
-            const res = await window.nexus.settings.fetchModels();
-            
-            if (res.success) {
-                showToast(`Connection Successful! Found ${res.models.length} brains.`, 'success');
-                if (window.loadNexusModels) window.loadNexusModels();
-            } else {
-                showToast(`Connection Failed: ${res.error}`, 'error');
-            }
-            testBtn.disabled = false;
-            testBtn.innerText = 'Test Connection';
-        };
-
-        saveBtn.onclick = async () => {
-            await window.nexus.settings.save(getFormData());
-            showToast('Settings saved successfully!', 'success');
-            if (window.loadNexusModels) window.loadNexusModels();
-        };
-    }
-
-    function initBookmarks() {
-        const list = document.getElementById('bookmark-list');
-        async function load() {
-            const bms = await window.nexus.bookmarks.get();
-            if (list) list.innerHTML = bms.map(b => `<div class="note-card"><div>${b.title}</div><small>${b.url}</small></div>`).join('');
-        }
-        load();
-    }
 
     function initImageGen() {
         const promptInput = document.getElementById('imagegen-prompt');

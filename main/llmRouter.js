@@ -84,6 +84,8 @@ function streamOpenRouter({ apiKey, model, messages, onChunk, onDone, onError })
  * Fetch available free models from OpenRouter.
  */
 async function fetchOpenRouterModels(apiKey) {
+  if (!apiKey) throw new Error('API key is required for OpenRouter');
+  
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'openrouter.ai',
@@ -91,6 +93,7 @@ async function fetchOpenRouterModels(apiKey) {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${apiKey}`,
+        'User-Agent': 'Nexus-Browser/1.0',
       },
     };
 
@@ -98,6 +101,13 @@ async function fetchOpenRouterModels(apiKey) {
       let body = '';
       res.on('data', (d) => (body += d));
       res.on('end', () => {
+        if (res.statusCode === 401) {
+          return reject(new Error('Invalid OpenRouter API key. Please check your settings.'));
+        }
+        if (res.statusCode !== 200) {
+          return reject(new Error(`OpenRouter returned status ${res.statusCode}`));
+        }
+        
         try {
           const json = JSON.parse(body);
           const models = (json.data || [])
@@ -113,12 +123,21 @@ async function fetchOpenRouterModels(apiKey) {
             }));
           resolve(models);
         } catch (e) {
-          reject(e);
+          reject(new Error('Failed to parse model list from OpenRouter.'));
         }
       });
     });
 
-    req.on('error', reject);
+    req.on('error', (err) => {
+      reject(new Error(`Network error: ${err.message}`));
+    });
+    
+    // Hard socket timeout
+    req.setTimeout(10000, () => {
+      req.destroy();
+      reject(new Error('OpenRouter connection timed out. Interface aborted request.'));
+    });
+
     req.end();
   });
 }
@@ -137,6 +156,11 @@ function streamOllama({ baseUrl, model, messages, onChunk, onDone, onError }) {
     model,
     messages,
     stream: true,
+    options: {
+        num_ctx: 4096,
+        temperature: 0.7
+    },
+    keep_alive: "5m" // Keep in memory for 5 mins
   });
 
   const options = {
@@ -327,19 +351,18 @@ async function fetchPollinationsModels() {
       res.on('end', () => {
         try {
           const json = JSON.parse(body);
-          // Assuming array of objects: [{"name": "openai-fast", "description": ...}]
           const models = Array.isArray(json) ? json.map(m => ({
               id: m.name || m.id,
               name: m.description || m.name || m.id,
               context_length: m.context_length || 4096
-          })) : [{id: 'openai', name: 'OpenAI (Pollinations Default)'}];
+          })) : [];
           
-          if(models.length === 0) models.push({id: 'openai', name: 'OpenAI (Pollinations Default)'});
+          if(models.length === 0) throw new Error('Empty model list');
           resolve(models);
         } catch (e) {
-          // Fallback to defaults if endpoint changes
+          // Robust fallback to known working models
           resolve([
-              {id: 'openai', name: 'OpenAI Base'},
+              {id: 'openai', name: 'OpenAI (Pollinations Default)'},
               {id: 'mistral', name: 'Mistral'},
               {id: 'claude', name: 'Claude'}
           ]);
@@ -347,11 +370,25 @@ async function fetchPollinationsModels() {
       });
     });
 
-    req.on('error', reject);
+    req.on('error', () => {
+        // Even on network error, return the fallback for Pollinations (it's often reliable but proxy-sensitive)
+        resolve([
+            {id: 'openai', name: 'OpenAI (Pollinations Default)'},
+            {id: 'mistral', name: 'Mistral'},
+            {id: 'claude', name: 'Claude'}
+        ]);
+    });
+
     req.setTimeout(5000, () => {
       req.destroy();
-      reject(new Error('Pollinations connection timeout'));
+      resolve([
+          {id: 'openai', name: 'OpenAI (Pollinations Default)'},
+          {id: 'mistral', name: 'Mistral'},
+          {id: 'claude', name: 'Claude'}
+      ]);
     });
+
+    req.end();
   });
 }
 

@@ -28,6 +28,19 @@ const schema = {
     },
     default: {},
   },
+  cachedModels: {
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string' },
+        context: { type: 'number' },
+        description: { type: 'string' }
+      }
+    },
+    default: [],
+  },
   agents: {
     type: 'array',
     default: [],
@@ -80,12 +93,23 @@ function getSettings() {
 
 function saveSettings(settings) {
   const store = getStore();
+  // Strictly map llm settings
   if (settings.provider) store.set('llm.provider', settings.provider);
-  if (settings.openrouterApiKey !== undefined) store.set('llm.openrouterApiKey', settings.openrouterApiKey);
+  if (typeof settings.openrouterApiKey === 'string') store.set('llm.openrouterApiKey', settings.openrouterApiKey);
   if (settings.openrouterModel) store.set('llm.openrouterModel', settings.openrouterModel);
   if (settings.ollamaBaseUrl) store.set('llm.ollamaBaseUrl', settings.ollamaBaseUrl);
   if (settings.ollamaModel) store.set('llm.ollamaModel', settings.ollamaModel);
-  if (settings.timeout !== undefined) store.set('llm.timeout', settings.timeout);
+  if (settings.timeout !== undefined) store.set('llm.timeout', Number(settings.timeout));
+}
+
+function getCachedModels() {
+  return getStore().get('cachedModels', []);
+}
+
+function cacheModels(models) {
+  if (Array.isArray(models) && models.length > 0) {
+    getStore().set('cachedModels', models);
+  }
 }
 
 // ─── Notes ────────────────────────────────────────────────────────────────────
@@ -187,7 +211,16 @@ function getPreferences() {
 function savePreferences(prefs) {
   const store = getStore();
   const current = store.get('preferences', {});
-  store.set('preferences', { ...current, ...prefs });
+  
+  // Only merge keys that belong to the preferences schema
+  const allowedKeys = ['theme', 'sidebarExpanded', 'homePage'];
+  const filteredPrefs = {};
+  
+  allowedKeys.forEach(key => {
+    if (prefs[key] !== undefined) filteredPrefs[key] = prefs[key];
+  });
+
+  store.set('preferences', { ...current, ...filteredPrefs });
 }
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
@@ -227,4 +260,6 @@ module.exports = {
   markSetupComplete,
   isSetupComplete,
   resetSetup,
+  getCachedModels,
+  cacheModels,
 };
