@@ -175,8 +175,15 @@ function createMainWindow() {
 
   // Set up permission handler for webview content
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    const allowedPermissions = ['media', 'notifications', 'geolocation'];
+    const allowedPermissions = ['media', 'notifications', 'geolocation', 'fullscreen'];
     callback(allowedPermissions.includes(permission));
+  });
+
+  // Handle webview full screen
+  mainWindow.webContents.on('will-attach-webview', (event, webPreferences, params) => {
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+    // webPreferences.fullscreen is true by default, but we can be explicit here if needed
   });
 
   // Handle new window requests from webviews — open in new tab

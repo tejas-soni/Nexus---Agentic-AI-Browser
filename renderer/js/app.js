@@ -412,6 +412,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const webview = document.createElement('webview');
         webview.id = `webview-${id}`;
         webview.setAttribute('allowpopups', '');
+        webview.setAttribute('allowfullscreen', '');
         
         webview.src = targetUrl;
         
@@ -461,6 +462,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const tab = state.tabs.find(t => t.id === tabId);
             if (tab) { tab.favicon = e.favicons[0]; renderTabs(); }
         });
+
+        webview.addEventListener('enter-html-full-screen', () => {
+            document.body.classList.add('is-fullscreen');
+        });
+        webview.addEventListener('leave-html-full-screen', () => {
+            document.body.classList.remove('is-fullscreen');
+        });
+
         webview.addEventListener('new-window', (e) => {
             e.preventDefault();
             createTab(e.url);
@@ -563,6 +572,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             webview = document.createElement('webview');
             webview.id = `webview-${tab.id}`;
             webview.setAttribute('allowpopups', '');
+            webview.setAttribute('allowfullscreen', '');
             elements.webviewContainer.appendChild(webview);
             setupWebviewEvents(webview, tab.id);
         }
