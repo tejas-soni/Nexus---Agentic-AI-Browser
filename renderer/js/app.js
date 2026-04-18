@@ -100,12 +100,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!btn) return;
 
         console.log('[NEXUS] Click Intercept:', btn.id || btn.className);
+        nexusLog(`TRACE: Global Click caught on ${btn.id || btn.className}`);
 
         if (btn.id === 'chat-send') {
-            if (processChat) processChat();
+            nexusLog('TRACE: Detected click on chat-send ID. Attempting to call processChat...');
+            if (processChat) {
+                nexusLog('TRACE: processChat variable is FOUND. Executing...');
+                processChat();
+            } else {
+                nexusLog('TRACE: ERROR - processChat variable is UNDEFINED in global scope.');
+            }
             return;
         }
-
         // --- Agents ---
         if (btn.id === 'btn-create-agent') {
             handleCreateAgent();
@@ -202,18 +208,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    elements.btnShields.onclick = (e) => {
-        e.stopPropagation();
-        toggleShieldsDropdown();
-    };
+    if (elements.btnShields) {
+        elements.btnShields.onclick = (e) => {
+            e.stopPropagation();
+            toggleShieldsDropdown();
+        };
+    }
 
     // Auto-save changes
     const saveShieldConfig = async () => {
         const domain = getActiveDomain();
         const config = {
-            enabled: elements.toggleShieldsOn.checked,
-            httpsUpgrade: elements.toggleHttpsUpgrade.checked,
-            fingerprinting: elements.toggleFingerprinting.checked
+            enabled: elements.toggleShieldsOn?.checked,
+            httpsUpgrade: elements.toggleHttpsUpgrade?.checked,
+            fingerprinting: elements.toggleFingerprinting?.checked
         };
         await window.nexus.shields.saveConfig(domain, config);
         
@@ -224,21 +232,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    elements.toggleShieldsOn.onchange = saveShieldConfig;
-    elements.toggleHttpsUpgrade.onchange = saveShieldConfig;
-    elements.toggleFingerprinting.onchange = saveShieldConfig;
+    if (elements.toggleShieldsOn) elements.toggleShieldsOn.onchange = saveShieldConfig;
+    if (elements.toggleHttpsUpgrade) elements.toggleHttpsUpgrade.onchange = saveShieldConfig;
+    if (elements.toggleFingerprinting) elements.toggleFingerprinting.onchange = saveShieldConfig;
 
     // Listen for real-time blocking events
     window.nexus.shields.onStatsUpdate((data) => {
-        elements.shieldCount.innerText = data.total;
+        if (elements.shieldCount) elements.shieldCount.innerText = data.total;
         // Subtle glow effect on shield icon when blocking occurs
-        elements.btnShields.style.color = 'var(--accent)';
-        setTimeout(() => { elements.btnShields.style.color = ''; }, 500);
+        if (elements.btnShields) {
+            elements.btnShields.style.color = 'var(--accent)';
+            setTimeout(() => { if (elements.btnShields) elements.btnShields.style.color = ''; }, 500);
+        }
     });
 
     // Close popup on click outside
     document.addEventListener('click', (e) => {
-        if (!elements.shieldsPopup.contains(e.target) && e.target !== elements.btnShields) {
+        if (elements.shieldsPopup && !elements.shieldsPopup.contains(e.target) && e.target !== elements.btnShields) {
             elements.shieldsPopup.classList.add('hidden');
         }
     });
@@ -440,7 +450,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 tab.url = webview.getURL();
                 renderTabs();
                 if (state.activeTabId === tabId) {
-                    elements.urlInput.value = tab.url;
+                    if (elements.urlInput) elements.urlInput.value = tab.url;
                     updateNavButtons(webview);
                 }
                 window.nexus.history.add({ title: tab.title, url: tab.url, favicon: tab.favicon });
@@ -500,7 +510,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const webview = document.getElementById(`webview-${id}`);
         if (webview) {
             webview.style.display = 'flex';
-            elements.urlInput.value = tab.url === 'nexus://newtab' ? '' : tab.url;
+            if (elements.urlInput) elements.urlInput.value = tab.url === 'nexus://newtab' ? '' : tab.url;
             updateNavButtons(webview);
         }
     }
@@ -518,6 +528,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function renderTabs() {
+        if (!elements.tabList) return;
         elements.tabList.innerHTML = '';
         state.tabs.forEach(tab => {
             const tabEl = document.createElement('div');
@@ -541,8 +552,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ─── Navigation Logic ─────────────────────────────────────────
 
     function updateNavButtons(webview) {
-        elements.btnBack.disabled = !webview.canGoBack();
-        elements.btnForward.disabled = !webview.canGoForward();
+        if (elements.btnBack) elements.btnBack.disabled = !webview.canGoBack();
+        if (elements.btnForward) elements.btnForward.disabled = !webview.canGoForward();
     }
 
     function navigateTo(url) {
@@ -564,20 +575,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     elements.btnForward.onclick = () => { const wv = document.getElementById(`webview-${state.activeTabId}`); if (wv) wv.goForward(); };
     elements.btnReload.onclick = () => { const tab = state.tabs.find(t => t.id === state.activeTabId); if (tab.url !== 'nexus://newtab') { const wv = document.getElementById(`webview-${state.activeTabId}`); if (wv) wv.reload(); } };
 
-    elements.urlInput.onkeydown = (e) => {
-        if (e.key === 'Enter') {
-            let val = elements.urlInput.value.trim();
-            if (!val) return;
-            if (!val.includes('://') && !val.startsWith('nexus://') && !val.startsWith('about:')) {
-                if (val.includes('.') && !val.includes(' ')) val = 'https://' + val;
-                else val = 'https://www.google.com/search?q=' + encodeURIComponent(val);
+    if (elements.urlInput) {
+        elements.urlInput.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                let val = elements.urlInput.value.trim();
+                if (!val) return;
+                if (!val.includes('://') && !val.startsWith('nexus://') && !val.startsWith('about:')) {
+                    if (val.includes('.') && !val.includes(' ')) val = 'https://' + val;
+                    else val = 'https://www.google.com/search?q=' + encodeURIComponent(val);
+                }
+                if (val.startsWith('about:')) val = 'nexus://' + val.substr(6);
+                navigateTo(val);
             }
-            if (val.startsWith('about:')) val = 'nexus://' + val.substr(6);
-            navigateTo(val);
-        }
-    };
+        };
+    }
 
-    elements.btnNewTab.onclick = () => createTab();
+    if (elements.btnNewTab) elements.btnNewTab.onclick = () => createTab();
     window.nexus.tabs.onOpenUrl?.((url) => navigateTo(url));
     window.nexus.tabs.onOpenNewTab?.((url) => createTab(url));
 
@@ -618,14 +631,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         webview.executeJavaScript(script).then(result => { window.nexus.tabs.sendInteractResult({ success: result }); }).catch(err => { window.nexus.tabs.sendInteractResult({ success: false, error: err.message }); });
     });
 
-    elements.newTabSearch.onkeydown = (e) => { if (e.key === 'Enter') navigateTo('https://www.google.com/search?q=' + encodeURIComponent(elements.newTabSearch.value)); };
-    document.querySelectorAll('.newtab__shortcut').forEach(sc => { sc.onclick = () => navigateTo(sc.getAttribute('data-url')); });
+    if (elements.newTabSearch) {
+        elements.newTabSearch.onkeydown = (e) => { 
+            if (e.key === 'Enter') navigateTo('https://www.google.com/search?q=' + encodeURIComponent(elements.newTabSearch.value)); 
+        };
+    }
+    document.querySelectorAll('.newtab__shortcut').forEach(sc => { 
+        sc.onclick = () => navigateTo(sc.getAttribute('data-url')); 
+    });
 
     // ─── Window Controls ──────────────────────────────────────────
     
-    document.getElementById('btn-minimize').onclick = () => window.nexus.window.minimize();
-    document.getElementById('btn-maximize').onclick = () => window.nexus.window.maximize();
-    document.getElementById('btn-close').onclick = () => window.nexus.window.close();
+    // ─── Window Controls (Safe Mode) ──────────────────────────
+    const safeAssignClick = (id, fn) => {
+        const el = document.getElementById(id);
+        if (el) el.onclick = fn;
+        else console.warn(`[NEXUS:STABILITY] Optional UI element not found: ${id}`);
+    };
+
+    safeAssignClick('btn-minimize', () => window.nexus.window.minimize());
+    safeAssignClick('btn-maximize', () => window.nexus.window.maximize());
+    safeAssignClick('btn-close', () => window.nexus.window.close());
 
     // ─── Native AI Browser Commands ───────────────────────────────
     
@@ -657,7 +683,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ─── Initialization ───────────────────────────────────────────
     
-    createTab();
+    try {
+        createTab();
+    } catch (err) {
+        console.error('[NEXUS:STABILITY] Initial createTab failed, suppressing to allow AI modules:', err);
+    }
 
     const initModule = (name, initFn) => {
         console.log('[NEXUS] Initializing module:', name);
@@ -676,6 +706,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log(`[NEXUS:UI] ${msg}`);
     }
 
+    // ─── Priority System Check (Always start AI first) ────────────
     initModule('Chat', initChat);
     initModule('Agents', initAgents);
     initModule('Notes', initNotes);
@@ -704,15 +735,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         let currentStreamText = '';
         let contextEnabled = false;
 
-        contextBtn.onclick = () => {
-            contextEnabled = !contextEnabled;
-            contextBtn.classList.toggle('active', contextEnabled);
-            contextBtn.style.color = contextEnabled ? 'var(--accent)' : 'var(--text-muted)';
-            contextBtn.style.background = contextEnabled ? 'var(--accent-subtle)' : 'transparent';
-            showToast(`AI Context Reading: ${contextEnabled ? 'ON' : 'OFF'}`, 'info');
-        };
+        if (contextBtn) {
+            contextBtn.onclick = () => {
+                contextEnabled = !contextEnabled;
+                contextBtn.classList.toggle('active', contextEnabled);
+                contextBtn.style.color = contextEnabled ? 'var(--accent)' : 'var(--text-muted)';
+                contextBtn.style.background = contextEnabled ? 'var(--accent-subtle)' : 'transparent';
+                showToast(`AI Context Reading: ${contextEnabled ? 'ON' : 'OFF'}`, 'info');
+            };
+        }
 
         function addMessage(role, content) {
+            if (!messagesEl) return null;
             const msg = document.createElement('div');
             msg.className = `chat__message chat__message--${role}`;
             const avatar = role === 'ai' ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>' : '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
@@ -751,43 +785,92 @@ document.addEventListener('DOMContentLoaded', async () => {
             cleanup(chatId);
         });
 
-        const processChat = async function() {
-            const text = input.value.trim();
-            if (!text) return;
-            input.value = '';
-            
-            // Clean up old state
-            currentStreamText = '';
-            activeChatId = 'chat-' + Date.now();
-            nexusLog(`Starting session: ${activeChatId}`);
-            
-            addMessage('user', text);
-            const aiMsg = addMessage('ai', 'Thinking...');
-            currentBubble = aiMsg.querySelector('.chat__bubble');
-
-            if (stopBtn) stopBtn.classList.remove('hidden');
-            if (send) send.classList.add('hidden');
-
-            if (contextEnabled) {
-                const snap = await window.nexus.tabs.getSnapshot();
-                if (snap.success && snap.snapshot) {
-                    sessionMessages.push({ role: 'system', content: `CRITICAL CONTEXT: You are looking at the page "${snap.snapshot.title}". URL: ${snap.snapshot.url}. Here is the distilled summary of the page: ${snap.snapshot.summary}` });
-                    showToast('AI read page context...', 'info');
+        processChat = async function() {
+            nexusLog('TRACE: Entering processChat logic...');
+            try {
+                const text = input.value?.trim();
+                nexusLog(`TRACE: Input text captured. Length: ${text?.length || 0}`);
+                if (!text) {
+                    nexusLog('TRACE: aborting - text is empty.');
+                    return;
                 }
+                
+                input.value = '';
+                
+                // Clean up old state
+                currentStreamText = '';
+                activeChatId = 'chat-' + Date.now();
+                nexusLog(`TRACE: Initializing session: ${activeChatId}`);
+                
+                addMessage('user', text);
+                const aiMsg = addMessage('ai', 'Thinking...');
+                if (!aiMsg) throw new Error('UI failed to render message bubble');
+                
+                currentBubble = aiMsg.querySelector('.chat__bubble');
+
+                if (stopBtn) stopBtn.classList.remove('hidden');
+                if (send) send.classList.add('hidden');
+
+                if (contextEnabled) {
+                    nexusLog('TRACE: Context enabled. Fetching snapshot...');
+                    const snap = await window.nexus.tabs.getSnapshot();
+                    if (snap && snap.success && snap.snapshot) {
+                        sessionMessages.push({ role: 'system', content: `CRITICAL CONTEXT: You are looking at the page "${snap.snapshot.title}". URL: ${snap.snapshot.url}. Here is the distilled summary of the page: ${snap.snapshot.summary}` });
+                        showToast('AI read page context...', 'info');
+                    }
+                }
+                sessionMessages.push({ role: 'user', content: text });
+
+                const modelSelect = document.getElementById('chat-model-select');
+                let model = modelSelect?.value;
+                nexusLog(`TRACE: Selected model from UI: ${model || 'DEFAULT'}`);
+                
+                // Final safety: if model is empty string (Loading/Offline), fallback to settings
+                if (!model) {
+                    nexusLog('TRACE: Model is empty, fetching native settings fallback...');
+                    const currentSettings = await window.nexus.settings.get();
+                    const provider = currentSettings.provider || 'openrouter';
+                    model = provider === 'openrouter' ? currentSettings.openrouterModel : (provider === 'ollama' ? currentSettings.ollamaModel : currentSettings.pollinationsModel);
+                    nexusLog(`TRACE: Fallback model resolved: ${model}`);
+                }
+
+                nexusLog(`TRACE: Dispatching stream request to IPC bridge for ${activeChatId}...`);
+                window.nexus.llm.stream(activeChatId, sessionMessages, model);
+                nexusLog('TRACE: IPC stream call dispatched successfully.');
+            } catch (err) {
+                nexusLog(`TRACE: FATAL ERROR in processChat: ${err.message}`);
+                console.error('[NEXUS:UI] processChat failed:', err);
+                showToast(`Chat Error: ${err.message}`, 'danger');
+                if (send) send.classList.remove('hidden');
+                if (stopBtn) stopBtn.classList.add('hidden');
             }
-            sessionMessages.push({ role: 'user', content: text });
-
-            const model = document.getElementById('chat-model-select')?.value;
-            window.nexus.llm.stream(activeChatId, sessionMessages, model);
         };
 
-        if (send) send.onclick = processChat;
-        if (stopBtn) stopBtn.onclick = () => {
-            window.nexus.llm.stop(activeChatId);
-            if (currentBubble) currentBubble.innerText += ' [Stopped]';
-            cleanup(activeChatId);
-        };
-        input.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); processChat(); } };
+        if (send) {
+            send.onclick = (e) => {
+                e.stopImmediatePropagation(); // Core fix: prevent global interceptor double-fire
+                processChat();
+            };
+        }
+        if (stopBtn) {
+            stopBtn.onclick = (e) => {
+                e.stopImmediatePropagation();
+                window.nexus.llm.stop(activeChatId);
+                if (currentBubble) currentBubble.innerText += ' [Stopped]';
+                cleanup(activeChatId);
+            };
+        }
+        if (input) {
+            input.onkeydown = (e) => { 
+                if (e.key === 'Enter' && !e.shiftKey) { 
+                    e.preventDefault(); 
+                    e.stopImmediatePropagation();
+                    processChat(); 
+                } 
+            };
+        }
+        
+        nexusLog('TRACE: Chat module wiring complete. Internal processChat assigned.');
     }
 
     function initAgents() {
