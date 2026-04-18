@@ -9,9 +9,10 @@ Nexus is a powerful, privacy-first desktop browser designed for the era of Agent
 ## 🚀 Key Features
 
 ### 🤖 Nexus AI Assistant
-- **Integrated Sidebar**: Access your AI assistant without leaving your tab.
+- **Immersive Sidebar**: Access your AI assistant without leaving your tab. Now features a **Premium Collapsible Design** to maximize workspace.
 - **Page Context Awareness**: Use the "Context" toggle to let the AI read and summarize the current page.
 - **Multi-Model Support**: Connect to **OpenRouter**, **Ollama** (Local), or use **Pollinations** for free.
+- **Cinematic Fullscreen**: Native support for YouTube and video players with automatic UI hiding for an immersive experience.
 
 ### ⚡ Autonomous Web Agents
 - **Agent Factory**: Create specialized agents with custom emojis, descriptions, and system instructions.
@@ -85,6 +86,17 @@ Nexus uses a custom internal protocol for all settings and workspace pages:
 - `nexus://bookmarks`
 - `nexus://history`
 - `nexus://newtab`
+
+---
+
+## ⌨️ Shortcuts
+
+Nexus is designed for efficiency. Use these shortcuts to navigate faster:
+
+- **Collapse/Expand Sidebar**: `Ctrl + B` (or `Cmd + B`)
+- **Focus Address Bar**: `Ctrl + L` (Standard)
+- **New Tab**: `Ctrl + T` (Standard)
+- **Fullscreen Video**: `F` (Within players like YouTube)
 
 ---
 
