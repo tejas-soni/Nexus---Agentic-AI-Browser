@@ -346,6 +346,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         elements.sidebarToggle.onclick = () => setSidebarExpanded(!state.isSidebarExpanded);
     }
 
+    // Sidebar Toggle Shortcut
+    window.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && (e.key === 'b' || e.key === 'B')) {
+            e.preventDefault();
+            if (elements.sidebarToggle) elements.sidebarToggle.click();
+        }
+    });
+
     elements.navItems.forEach(item => {
         item.onclick = () => {
             const panel = item.getAttribute('data-panel');

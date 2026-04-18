@@ -78,12 +78,60 @@
 .sidebar__brand {
   height: 56px;
   display: flex;
-  align-items: center;
+  justify-content: space-between;
   padding: 0 var(--space-4);
   gap: var(--space-3);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  position: relative;
+}
+
+.sidebar__toggle {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  transition: all var(--duration-fast) var(--ease-default);
   cursor: pointer;
+  background: var(--bg-hover);
+}
+.sidebar__toggle:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+.sidebar__toggle svg { 
+  width: 16px; 
+  height: 16px; 
+  transition: transform var(--duration-base) var(--ease-default);
+}
+
+.sidebar.expanded .sidebar__toggle svg { transform: rotate(0deg); }
+.sidebar:not(.expanded) .sidebar__toggle svg { transform: rotate(180deg); }
+
+/* In collapsed mode, we hide the title but keep the logo centered */
+.sidebar:not(.expanded) .sidebar__brand {
+  justify-content: center;
+  padding: 0;
+}
+.sidebar:not(.expanded) .sidebar__title,
+.sidebar:not(.expanded) .sidebar__section-title,
+.sidebar:not(.expanded) .sidebar__item-label {
+  display: none !important;
+}
+.sidebar:not(.expanded) .sidebar__toggle {
+  position: absolute;
+  bottom: -14px; /* Optional: float it? No, keep it in brand area but maybe better positioned */
+  display: none; /* Hide toggle text but maybe keep icon? Let's rethink. */
+}
+/* Better: toggle is always visible but maybe at the bottom or top center */
+.sidebar:not(.expanded) .sidebar__toggle {
+  display: flex;
+  position: relative;
+  bottom: auto;
+  margin: 0 auto;
 }
 
 .sidebar__logo {
@@ -132,6 +180,18 @@
   cursor: pointer;
   white-space: nowrap;
   position: relative;
+  min-height: 40px;
+}
+/* Center icons when collapsed */
+.sidebar:not(.expanded) .sidebar__item {
+  justify-content: center;
+  padding: var(--space-2) 0;
+  gap: 0;
+}
+/* Adjust active indicator for collapsed state */
+.sidebar:not(.expanded) .sidebar__item.active::before {
+  left: 2px;
+  height: 16px;
 }
 .sidebar__item:hover {
   background: var(--bg-hover);
@@ -183,6 +243,10 @@
   transition: opacity var(--duration-fast) var(--ease-default);
 }
 .sidebar.expanded .sidebar__section-title { opacity: 1; }
+
+.sidebar:not(.expanded) .sidebar__nav {
+  padding: var(--space-3) 0;
+}
 
 .sidebar__bottom {
   padding: var(--space-3) var(--space-2);
