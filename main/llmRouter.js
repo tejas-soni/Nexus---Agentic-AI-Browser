@@ -406,13 +406,10 @@ function streamLLM({ settings, messages, model, onChunk, onDone, onError }) {
   const provider = settings.provider || 'openrouter';
   let targetModel = model;
   
-  console.log(`[NEXUS:TRACE] llmRouter: Routing request. Provider: ${provider} | Input Model: ${model || 'None'}`);
-
   if (!targetModel) {
       if (provider === 'openrouter') targetModel = settings.openrouterModel;
       else if (provider === 'ollama') targetModel = settings.ollamaModel;
       else if (provider === 'pollinations') targetModel = settings.pollinationsModel;
-      console.log(`[NEXUS:TRACE] llmRouter: Resolved model from settings: ${targetModel}`);
   }
 
   if (provider === 'openrouter') {

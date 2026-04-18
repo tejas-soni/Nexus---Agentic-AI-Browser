@@ -99,19 +99,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const btn = target.closest('button');
         if (!btn) return;
 
-        console.log('[NEXUS] Click Intercept:', btn.id || btn.className);
-        nexusLog(`TRACE: Global Click caught on ${btn.id || btn.className}`);
-
-        if (btn.id === 'chat-send') {
-            nexusLog('TRACE: Detected click on chat-send ID. Attempting to call processChat...');
-            if (processChat) {
-                nexusLog('TRACE: processChat variable is FOUND. Executing...');
-                processChat();
-            } else {
-                nexusLog('TRACE: ERROR - processChat variable is UNDEFINED in global scope.');
-            }
-            return;
-        }
         // --- Agents ---
         if (btn.id === 'btn-create-agent') {
             handleCreateAgent();
@@ -450,7 +437,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 tab.url = webview.getURL();
                 renderTabs();
                 if (state.activeTabId === tabId) {
-                    if (elements.urlInput) elements.urlInput.value = tab.url;
+                    if (elements.urlInput) {
+                        elements.urlInput.value = (tab.url === 'nexus://newtab' || tab.url === 'nexus://newtab/') ? '' : tab.url;
+                    }
                     updateNavButtons(webview);
                 }
                 window.nexus.history.add({ title: tab.title, url: tab.url, favicon: tab.favicon });
@@ -510,7 +499,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const webview = document.getElementById(`webview-${id}`);
         if (webview) {
             webview.style.display = 'flex';
-            if (elements.urlInput) elements.urlInput.value = tab.url === 'nexus://newtab' ? '' : tab.url;
+            if (elements.urlInput) {
+                elements.urlInput.value = (tab.url === 'nexus://newtab' || tab.url === 'nexus://newtab/') ? '' : tab.url;
+            }
             updateNavButtons(webview);
         }
     }
@@ -698,13 +689,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // ─── Safety Shield ───
-    function nexusLog(msg) {
-        if (window.nexus && window.nexus.log) {
-            window.nexus.log(msg);
-        }
-        console.log(`[NEXUS:UI] ${msg}`);
-    }
 
     // ─── Priority System Check (Always start AI first) ────────────
     initModule('Chat', initChat);
@@ -759,7 +743,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         // --- Persistent Persistent Listeners ---
         window.nexus.llm.onChunk(({ chatId, chunk }) => {
             if (chatId !== activeChatId) return;
-            nexusLog(`Chunk received for ${chatId}`);
             currentStreamText += chunk;
             if (currentBubble) currentBubble.innerText = currentStreamText;
             messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -772,28 +755,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
 
         window.nexus.llm.onDone(({ chatId }) => {
-            nexusLog(`Done: ${chatId}`);
             if (chatId !== activeChatId) return;
             sessionMessages.push({ role: 'assistant', content: currentStreamText });
             cleanup(chatId);
         });
 
         window.nexus.llm.onError(({ chatId, error }) => {
-            nexusLog(`Error for ${chatId}: ${error}`);
             if (chatId !== activeChatId) return;
             if (currentBubble) currentBubble.innerText = `Error: ${error}`;
             cleanup(chatId);
         });
 
         processChat = async function() {
-            nexusLog('TRACE: Entering processChat logic...');
             try {
                 const text = input.value?.trim();
-                nexusLog(`TRACE: Input text captured. Length: ${text?.length || 0}`);
-                if (!text) {
-                    nexusLog('TRACE: aborting - text is empty.');
-                    return;
-                }
+                if (!text) return;
                 
                 input.value = '';
                 
@@ -869,8 +845,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } 
             };
         }
-        
-        nexusLog('TRACE: Chat module wiring complete. Internal processChat assigned.');
     }
 
     function initAgents() {

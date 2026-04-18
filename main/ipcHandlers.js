@@ -58,10 +58,7 @@ module.exports = function registerIpcHandlers() {
   });
 
   ipcMain.on('llm:stream', (event, { chatId, messages, model }) => {
-    console.log(`[NEXUS:TRACE] IPC Received: llm:stream. ChatId: ${chatId}`);
     const settings = getSettings();
-    console.log(`[NEXUS:MAIN] LLM Stream requested: ${chatId}`);
-    console.log(`[NEXUS:CONFIG] Provider: ${settings.provider || 'openrouter'} | Model: ${model || (settings.provider === 'ollama' ? settings.ollamaModel : settings.openrouterModel)}`);
     
     if (activeLlmStreams.has(chatId)) {
       console.log(`[NEXUS:MAIN] Aborting existing stream for: ${chatId}`);
