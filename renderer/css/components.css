@@ -1092,9 +1092,24 @@ select.input option {
   background: var(--bg-surface);
   border-top: 1px solid var(--border);
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.chat__input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.chat__composer {
+  display: flex;
   align-items: flex-end;
   gap: var(--space-2);
-  flex-shrink: 0;
+  width: 100%;
 }
 
 .chat__input {
@@ -1111,6 +1126,14 @@ select.input option {
   line-height: 1.5;
 }
 .chat__input:focus { border-color: var(--accent); }
+
+.chat__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
 
 .chat__send {
   width: 32px;
@@ -1164,5 +1187,4 @@ select.input option {
   transition: color 0.2s;
 }
 .modal-close:hover { color: var(--text-primary); }
-
 

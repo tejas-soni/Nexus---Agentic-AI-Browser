@@ -27,8 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     let availableModels = [];
-    let refreshAgentsList = null;
-    let agentsInitialized = false;
+    let processChat;
 
     async function loadAvailableModels(retryCount = 0) {
         const chatModelSelect = document.getElementById('chat-model-select');
@@ -101,6 +100,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!btn) return;
 
         console.log('[NEXUS] Click Intercept:', btn.id || btn.className);
+
+        if (btn.id === 'chat-send') {
+            if (processChat) processChat();
+            return;
+        }
 
         // --- Agents ---
         if (btn.id === 'btn-create-agent') {
@@ -300,10 +304,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             overlay.appendChild(modal);
             const container = document.getElementById('modal-container') || document.body;
             container.appendChild(overlay);
-            modal.style.pointerEvents = 'auto';
-            modal.style.userSelect = 'text';
-            const modalBody = modal.querySelector('.modal__body');
-            if (modalBody) modalBody.style.pointerEvents = 'auto';
 
             const resolveData = (cancelled) => {
                 if (cancelled) resolve(null);
@@ -323,11 +323,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             modal.querySelector('#modal-save-btn').addEventListener('click', (e) => { e.stopPropagation(); resolveData(false); });
             modal.querySelector('#modal-cancel-btn').addEventListener('click', (e) => { e.stopPropagation(); resolveData(true); });
             modal.querySelector('#modal-cancel-footer-btn').addEventListener('click', (e) => { e.stopPropagation(); resolveData(true); });
-            modal.addEventListener('click', (e) => e.stopPropagation());
             overlay.addEventListener('click', (e) => { if (e.target === overlay) { e.stopPropagation(); resolveData(true); } });
             
             setTimeout(() => { 
-                const first = modal.querySelector('textarea, input:not([type="hidden"]), select'); 
+                const first = modal.querySelector('input, textarea'); 
                 if (first) first.focus(); 
             }, 100);
             
@@ -376,12 +375,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             target.classList.add('active');
             elements.rightPanel.classList.add('open');
             state.activePanel = panelId;
-            if (panelId === 'agents' && !agentsInitialized) {
-                initAgents();
-            }
-            if (panelId === 'agents' && typeof refreshAgentsList === 'function') {
-                refreshAgentsList().catch((error) => console.error('[NEXUS:UI] Failed to reload agents panel:', error));
-            }
         }
     }
 
@@ -758,7 +751,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             cleanup(chatId);
         });
 
-        async function processChat() {
+        const processChat = async function() {
             const text = input.value.trim();
             if (!text) return;
             input.value = '';
@@ -786,9 +779,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const model = document.getElementById('chat-model-select')?.value;
             window.nexus.llm.stream(activeChatId, sessionMessages, model);
-        }
+        };
 
-        send.onclick = processChat;
+        if (send) send.onclick = processChat;
         if (stopBtn) stopBtn.onclick = () => {
             window.nexus.llm.stop(activeChatId);
             if (currentBubble) currentBubble.innerText += ' [Stopped]';
@@ -797,130 +790,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         input.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); processChat(); } };
     }
 
-    function renderAgentCards(list, agents) {
-        if (!list) return;
-
-        list.innerHTML = '';
-
-        if (!agents || agents.length === 0) {
-            list.innerHTML = '<div class="empty-state">No Agents found.</div>';
-            return;
-        }
-
-        const fragment = document.createDocumentFragment();
-
-        agents.forEach((a) => {
-            const card = document.createElement('div');
-            card.className = 'agent-card';
-            card.id = `agent-${a.id}`;
-
-            const header = document.createElement('div');
-            header.className = 'agent-card__header';
-
-            const avatar = document.createElement('div');
-            avatar.className = 'agent-card__avatar';
-            avatar.textContent = a.emoji || '🤖';
-
-            const info = document.createElement('div');
-            info.className = 'agent-card__info';
-
-            const name = document.createElement('div');
-            name.className = 'agent-card__name';
-            name.textContent = a.name || 'Untitled Agent';
-
-            const desc = document.createElement('div');
-            desc.className = 'agent-card__desc';
-            desc.textContent = a.description || '';
-
-            info.appendChild(name);
-            info.appendChild(desc);
-            header.appendChild(avatar);
-            header.appendChild(info);
-
-            const actions = document.createElement('div');
-            actions.className = 'agent-card__actions';
-
-            const runBtn = document.createElement('button');
-            runBtn.className = 'btn btn-primary btn-sm btn-run';
-            runBtn.dataset.id = a.id;
-            runBtn.textContent = 'Run';
-
-            const stopBtn = document.createElement('button');
-            stopBtn.className = 'btn btn-danger btn-sm btn-stop hidden';
-            stopBtn.id = `stop-${a.id}`;
-            stopBtn.dataset.id = a.id;
-            stopBtn.textContent = 'Stop';
-
-            const editBtn = document.createElement('button');
-            editBtn.className = 'btn btn-ghost btn-sm btn-edit';
-            editBtn.dataset.id = a.id;
-            editBtn.textContent = 'Edit';
-
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'btn btn-danger btn-sm btn-delete';
-            deleteBtn.dataset.id = a.id;
-            deleteBtn.textContent = 'Delete';
-
-            actions.appendChild(runBtn);
-            actions.appendChild(stopBtn);
-            actions.appendChild(editBtn);
-            actions.appendChild(deleteBtn);
-
-            const log = document.createElement('div');
-            log.className = 'agent-log hidden';
-            log.id = `log-${a.id}`;
-
-            const interaction = document.createElement('div');
-            interaction.className = 'agent-interaction hidden';
-            interaction.id = `interaction-${a.id}`;
-            interaction.style.marginTop = '8px';
-            interaction.style.display = 'flex';
-            interaction.style.gap = '8px';
-
-            const instructInput = document.createElement('input');
-            instructInput.type = 'text';
-            instructInput.className = 'input';
-            instructInput.id = `instruct-input-${a.id}`;
-            instructInput.placeholder = 'Type instruction to instantly interrupt...';
-            instructInput.autocomplete = 'off';
-            instructInput.style.flex = '1';
-            instructInput.style.padding = '6px';
-            instructInput.style.fontSize = '12px';
-            instructInput.style.background = 'rgba(0,0,0,0.2)';
-
-            const instructBtn = document.createElement('button');
-            instructBtn.className = 'btn btn-primary btn-sm btn-instruct';
-            instructBtn.dataset.id = a.id;
-            instructBtn.textContent = 'Send';
-
-            interaction.appendChild(instructInput);
-            interaction.appendChild(instructBtn);
-
-            card.appendChild(header);
-            card.appendChild(actions);
-            card.appendChild(log);
-            card.appendChild(interaction);
-            fragment.appendChild(card);
-        });
-
-        list.appendChild(fragment);
-        nexusLog(`Agents rendered: ${agents.length}`);
-    }
-
     function initAgents() {
-        if (agentsInitialized) return;
-        agentsInitialized = true;
-
         const list = document.getElementById('agent-list');
         const createBtn = document.getElementById('btn-create-agent');
-        if (createBtn) createBtn.onclick = null;
+        if (createBtn) createBtn.onclick = () => handleCreateAgent();
 
         async function load() {
             const agents = await window.nexus.agents.get();
-            if (!list) return;
-            nexusLog(`Agents fetched for panel: ${Array.isArray(agents) ? agents.length : 0}`);
-            renderAgentCards(list, agents);
-            return;
             if (agents.length === 0) list.innerHTML = '<div class="empty-state">No Agents found.</div>';
             else list.innerHTML = agents.map(a => `
                 <div class="agent-card" id="agent-${a.id}">
@@ -934,6 +810,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <button class="btn btn-ghost btn-sm btn-edit" data-id="${a.id}">Edit</button>
                         <button class="btn btn-danger btn-sm btn-delete" data-id="${a.id}">Delete</button>
                     </div>
+                    </div>
                     <div class="agent-log hidden" id="log-${a.id}"></div>
                     <div class="agent-interaction hidden" id="interaction-${a.id}" style="margin-top: 8px; display: flex; gap: 8px;">
                         <input type="text" class="input" id="instruct-input-${a.id}" placeholder="Type instruction to instantly interrupt..." style="flex: 1; padding: 6px; font-size: 12px; background: rgba(0,0,0,0.2);" autocomplete="off">
@@ -942,7 +819,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
             `).join('');
         }
-        refreshAgentsList = load;
         window.loadAgents = load;
         
         // --- Centralized Agent Event Routing ---
@@ -993,35 +869,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             {id:'model',label:'Model (Brain)',type:'select',options:availableModels},
             {id:'emoji',label:'Choose Personality',type:'emoji',value:'🤖'}
         ]);
-        if (!res) return;
-
-        const agent = {
-            name: (res.name || '').trim(),
-            description: (res.description || '').trim(),
-            model: res.model || (availableModels[0] ? availableModels[0].id : ''),
-            emoji: res.emoji || 'ðŸ¤–'
-        };
-
-        if (!agent.name) {
-            showToast('Agent name is required.', 'warning');
-            return;
-        }
-
-        try {
-            const savedAgents = await window.nexus.agents.save(agent);
-            const list = document.getElementById('agent-list');
-            if (Array.isArray(savedAgents) && list) {
-                renderAgentCards(list, savedAgents);
-            }
-            if (typeof refreshAgentsList === 'function') {
-                await refreshAgentsList();
-            }
-            nexusLog(`Agent saved. Total agents: ${Array.isArray(savedAgents) ? savedAgents.length : 'unknown'}`);
-            showToast('Agent created!', 'success');
-        } catch (error) {
-            console.error('[NEXUS:UI] Failed to create agent:', error);
-            showToast(`Agent save failed: ${error.message}`, 'error');
-        }
+        if (res) { await window.nexus.agents.save(res); window.loadAgents(); showToast('Agent created!', 'success'); }
     }
 
     async function handleEditAgent(id) {
@@ -1034,26 +882,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             {id:'model',label:'Model (Brain)',type:'select',value:a.model,options:availableModels},
             {id:'emoji',label:'Choose Personality',type:'emoji',value:a.emoji}
         ]);
-        if (!res) return;
-
-        const savedAgents = await window.nexus.agents.save({...a, ...res});
-        const list = document.getElementById('agent-list');
-        if (Array.isArray(savedAgents) && list) {
-            renderAgentCards(list, savedAgents);
-        }
-        if (typeof refreshAgentsList === 'function') {
-            await refreshAgentsList();
-        }
-        showToast('Agent updated!', 'success');
+        if (res) { await window.nexus.agents.save({...a, ...res}); window.loadAgents(); showToast('Agent updated!', 'success'); }
     }
 
     async function handleDeleteAgent(id) {
-        if (!confirm('Delete this agent?')) return;
-
-        await window.nexus.agents.delete(id);
-        if (typeof refreshAgentsList === 'function') {
-            await refreshAgentsList();
-        }
+        if (confirm('Delete this agent?')) { await window.nexus.agents.delete(id); window.loadAgents(); }
     }
 
     async function handleRunAgent(id, task = null) {

@@ -284,15 +284,17 @@
             </div>
             <div class="chat__input-wrapper">
               <span class="chat__brain-label">Ask Anything</span>
-              <textarea class="chat__input" id="chat-input" placeholder="Type your message here..." rows="1"></textarea>
-            </div>
-            <div class="chat__actions">
-              <button class="chat__send hidden" id="chat-stop" title="Stop AI" style="background:var(--danger);color:white">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12"/></svg>
-              </button>
-              <button class="chat__send" id="chat-send">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              </button>
+              <div class="chat__composer">
+                <textarea class="chat__input" id="chat-input" placeholder="Type your message here..." rows="1"></textarea>
+                <div class="chat__actions">
+                  <button type="button" class="chat__send hidden" id="chat-stop" title="Stop AI" style="background:var(--danger);color:white">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12"/></svg>
+                  </button>
+                  <button type="button" class="chat__send" id="chat-send" title="Send message">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -170,14 +170,22 @@
     </div>
 
     <script>
-        const { nexus } = window;
         const container = document.getElementById('history-container');
         const searchInput = document.getElementById('history-search');
         const clearBtn = document.getElementById('btn-clear-history');
 
+        function sendIPC(action, data) {
+            return new Promise((resolve) => {
+                const reqId = Date.now().toString() + Math.random();
+                window._ipcCallbacks = window._ipcCallbacks || {};
+                window._ipcCallbacks[reqId] = resolve;
+                console.log('NEXUS_IPC:' + JSON.stringify({ action, data, reqId }));
+            });
+        }
+
         async function loadHistory() {
             const query = searchInput.value;
-            const history = await nexus.history.get({ search: query, limit: 200 });
+            const history = await sendIPC('history.get', { search: query, limit: 200 });
             
             if (history.length === 0) {
                 container.innerHTML = `<div class="empty-state">No history found${query ? ' for "' + query + '"' : ''}.</div>`;
@@ -222,13 +230,13 @@
         window.deleteEntry = async (id, e) => {
             e.preventDefault();
             e.stopPropagation();
-            await nexus.history.remove(id);
+            await sendIPC('history.remove', id);
             loadHistory();
         };
 
         clearBtn.onclick = async () => {
             if (confirm('Are you sure you want to clear your entire browsing history?')) {
-                await nexus.history.clear();
+                await sendIPC('history.clear');
                 loadHistory();
             }
         };
