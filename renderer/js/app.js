@@ -155,8 +155,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         toggleHttpsUpgrade: document.getElementById('toggle-https-upgrade'),
         toggleFingerprinting: document.getElementById('toggle-fingerprinting'),
         webviewContainer: document.getElementById('webview-container'),
-        newTabPage: document.getElementById('newtab-page'),
-        newTabSearch: document.getElementById('newtab-search'),
         rightPanel: document.getElementById('right-panel'),
         btnAiToggle: document.getElementById('btn-ai-toggle'),
         navItems: document.querySelectorAll('.sidebar__item'),
@@ -605,7 +603,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const tab = state.tabs.find(t => t.id === id);
         renderTabs();
         document.querySelectorAll('webview').forEach(wv => wv.style.display = 'none');
-        elements.newTabPage.style.display = 'none';
         
         const webview = document.getElementById(`webview-${id}`);
         if (webview) {
