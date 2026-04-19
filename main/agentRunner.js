@@ -12,7 +12,7 @@ const { streamLLM } = require('./llmRouter');
  * Define tool metadata and execution logic.
  * In Phase 2, some tools require 'browserActions' to be provided.
  */
-function getTools(browserActions) {
+function getTools(browserActions, model) {
   return {
     web_search: {
       name: 'web_search',
@@ -225,7 +225,7 @@ function runAgent({ agentId, agentName, agentDescription, task, model, settings,
   let stepCount = 0;
   const MAX_STEPS = 30; // Doubled for complex real-world workflows
 
-  const TOOLS = getTools(browserActions);
+  const TOOLS = getTools(browserActions, model);
 
   const messages = [
     { role: 'system', content: buildAgentSystemPrompt(agentName, agentDescription, TOOLS) + `\n\nDEADLINE: You have a maximum of ${MAX_STEPS} steps to complete this mission. If you reach step 25, you MUST prioritize the 'report' tool with whatever info you have.` },
@@ -336,8 +336,23 @@ function runAgent({ agentId, agentName, agentDescription, task, model, settings,
 
   // Start the loop with a small delay to avoid "burst" behavior that triggers anti-bot filters
   const ignitionDelay = settings.timeout || 300;
-  setTimeout(() => {
-    if (!aborted) executeNextStep();
+  setTimeout(async () => {
+    if (aborted) return;
+    
+    // Proactive Awareness: Check if we can see the page before starting
+    if (browserActions?.getSnapshot) {
+        onStep({ type: 'thinking', content: 'Agent is scanning the active page for context...' });
+        try {
+            const result = await browserActions.getSnapshot();
+            if (result.success && result.snapshot) {
+                const { title, url, summary } = result.snapshot;
+                messages.push({ role: 'user', content: `Observation: You are already on "${title}" (${url}). Summary: ${summary}. You may proceed with actions or use browse_active_tab for full details.` });
+                onStep({ type: 'info', content: `Agent spotted current page: ${title}` });
+            }
+        } catch (_) {}
+    }
+    
+    executeNextStep();
   }, ignitionDelay);
 
   return {
