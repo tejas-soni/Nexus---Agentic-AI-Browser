@@ -301,4 +301,16 @@ module.exports = function registerIpcHandlers() {
     });
   });
 
+  // ─── Shell ─────────────────────────────────────────────────────────────────
+
+  ipcMain.handle('shell:open-external', async (_, url) => {
+    try {
+      await shell.openExternal(url);
+      return { success: true };
+    } catch (e) {
+      console.error(`[NEXUS:MAIN] Failed to open external URL: ${url}`, e);
+      return { success: false, error: e.message };
+    }
+  });
+
 };

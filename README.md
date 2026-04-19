@@ -31,9 +31,10 @@ Nexus is a powerful, privacy-first desktop browser designed for the era of Agent
 
 ### 📂 Pro Workspace
 - **Integrated Notes**: Keep track of ideas with a native markdown notes manager.
-- **Modern Bookmarks**: Organize your favorite sites with a sleek, interactive interface.
-- **Smart History**: Fully searchable browsing history powered by SQLite.
-- **Downloads Manager**: Centralized hub for all your local files.
+- **Modern Bookmarks**: Organize your favorite sites with a sleek, interactive interface and **instant debounced search**.
+- **Smart History**: Fully searchable browsing history powered by a robust **SQLite engine** for high-performance persistence.
+- **Downloads Manager**: Centralized hub for all session downloads.
+- **Unified New Tab**: A high-performance, flicker-free home screen that launches directly into the modern engine.
 
 ---
 
@@ -89,14 +90,32 @@ Nexus uses a custom internal protocol for all settings and workspace pages:
 
 ---
 
-## ⌨️ Shortcuts
-
 Nexus is designed for efficiency. Use these shortcuts to navigate faster:
 
-- **Collapse/Expand Sidebar**: `Ctrl + B` (or `Cmd + B`)
-- **Focus Address Bar**: `Ctrl + L` (Standard)
-- **New Tab**: `Ctrl + T` (Standard)
+- **Collapse/Expand Sidebar**: `Ctrl + B`
+- **Focus Address Bar**: `Ctrl + L` or `Alt + D`
+- **New Tab**: `Ctrl + T`
+- **Close Active Tab**: `Ctrl + W`
+- **Reopen Closed Tab**: `Ctrl + Shift + T` (Sessions based)
+- **Refresh Page**: `Ctrl + R` or `F5`
+- **Open History**: `Ctrl + H`
+- **Open Bookmarks**: `Ctrl + Shift + O`
 - **Fullscreen Video**: `F` (Within players like YouTube)
+
+---
+
+## 🧹 Performing a Fresh Start
+
+If you need to reset Nexus to its factory state (clearing all History, Bookmarks, and AI settings), you can use the built-in utility:
+
+1. Close the Nexus Browser.
+2. Run the `reset_nexus.ps1` script in the root directory:
+   ```powershell
+   ./reset_nexus.ps1
+   ```
+3. Alternatively, you can manually delete the data folder at:
+   - **Windows**: `%APPDATA%/Nexus`
+   - **Linux**: `~/.config/Nexus`
 
 ---
 
