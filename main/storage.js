@@ -17,13 +17,15 @@ const schema = {
   llm: {
     type: 'object',
     properties: {
-      provider: { type: 'string', enum: ['openrouter', 'ollama', 'pollinations'], default: 'openrouter' },
+      provider: { type: 'string', enum: ['openrouter', 'ollama', 'pollinations', 'groq'], default: 'openrouter' },
       openrouterApiKey: { type: 'string', default: '' },
       openrouterModel: { type: 'string', default: 'meta-llama/llama-3.3-70b-instruct:free' },
       ollamaBaseUrl: { type: 'string', default: 'http://localhost:11434' },
       ollamaModel: { type: 'string', default: '' },
       pollinationsApiKey: { type: 'string', default: '' },
       pollinationsModel: { type: 'string', default: 'openai' },
+      groqApiKey: { type: 'string', default: '' },
+      groqModel: { type: 'string', default: 'llama3-70b-8192' },
       searchEngine: { type: 'string', enum: ['google', 'brave', 'duckduckgo', 'bing'], default: 'google' },
       timeout: { type: 'number', default: 300 },
     },
@@ -88,6 +90,10 @@ function getSettings() {
     openrouterModel: store.get('llm.openrouterModel', 'meta-llama/llama-3.3-70b-instruct:free'),
     ollamaBaseUrl: store.get('llm.ollamaBaseUrl', 'http://localhost:11434'),
     ollamaModel: store.get('llm.ollamaModel', ''),
+    pollinationsApiKey: store.get('llm.pollinationsApiKey', ''),
+    pollinationsModel: store.get('llm.pollinationsModel', 'openai'),
+    groqApiKey: store.get('llm.groqApiKey', ''),
+    groqModel: store.get('llm.groqModel', 'llama3-70b-8192'),
     searchEngine: store.get('llm.searchEngine', 'google'),
     timeout: store.get('llm.timeout', 300),
   };
@@ -109,6 +115,10 @@ function saveSettings(newSettings) {
   if (newSettings.openrouterModel) store.set('llm.openrouterModel', newSettings.openrouterModel);
   if (newSettings.ollamaBaseUrl) store.set('llm.ollamaBaseUrl', newSettings.ollamaBaseUrl);
   if (newSettings.ollamaModel) store.set('llm.ollamaModel', newSettings.ollamaModel);
+  if (newSettings.pollinationsApiKey) store.set('llm.pollinationsApiKey', newSettings.pollinationsApiKey);
+  if (newSettings.pollinationsModel) store.set('llm.pollinationsModel', newSettings.pollinationsModel);
+  if (newSettings.groqApiKey) store.set('llm.groqApiKey', newSettings.groqApiKey);
+  if (newSettings.groqModel) store.set('llm.groqModel', newSettings.groqModel);
   if (newSettings.searchEngine) store.set('llm.searchEngine', newSettings.searchEngine);
   
   if (newSettings.timeout !== undefined) {

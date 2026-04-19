@@ -195,6 +195,7 @@
                                 <option value="openrouter">OpenRouter (Cloud)</option>
                                 <option value="ollama">Ollama (Local)</option>
                                 <option value="pollinations">Pollinations (Free)</option>
+                                <option value="groq">Groq (High-Speed)</option>
                             </select>
                         </div>
                     </div>
@@ -225,6 +226,17 @@
                             <div class="input-group">
                                 <input class="input" type="text" id="set-ollamaBaseUrl" value="http://localhost:11434">
                                 <button class="btn btn-ghost" id="btn-test-ollama">Test Connection</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="group-groq" class="setting-item hidden">
+                        <div class="setting-label">Groq API Key</div>
+                        <div class="setting-description">Required for Groq's low-latency inference.</div>
+                        <div class="setting-control">
+                            <div class="input-group">
+                                <input class="input" type="password" id="set-groqApiKey" placeholder="gsk_...">
+                                <button class="btn btn-ghost" id="btn-test-groq">Test Connection</button>
                             </div>
                         </div>
                     </div>
@@ -288,6 +300,7 @@
             document.getElementById('set-provider').value = s.provider || 'openrouter';
             document.getElementById('set-openrouterApiKey').value = s.openrouterApiKey || '';
             document.getElementById('set-ollamaBaseUrl').value = s.ollamaBaseUrl || 'http://localhost:11434';
+            document.getElementById('set-groqApiKey').value = s.groqApiKey || '';
             document.getElementById('set-timeout').value = s.timeout || 300;
             document.getElementById('set-search-engine').value = s.searchEngine || 'google';
             
@@ -298,6 +311,7 @@
             const provider = document.getElementById('set-provider').value;
             document.getElementById('group-openrouter').classList.toggle('hidden', provider !== 'openrouter');
             document.getElementById('group-ollama').classList.toggle('hidden', provider !== 'ollama');
+            document.getElementById('group-groq').classList.toggle('hidden', provider !== 'groq');
         }
 
         document.getElementById('set-provider').onchange = updateProviderGroups;
@@ -314,6 +328,7 @@
                 provider: document.getElementById('set-provider').value,
                 openrouterApiKey: document.getElementById('set-openrouterApiKey').value,
                 ollamaBaseUrl: document.getElementById('set-ollamaBaseUrl').value,
+                groqApiKey: document.getElementById('set-groqApiKey').value,
                 searchEngine: document.getElementById('set-search-engine').value,
                 timeout: parseInt(document.getElementById('set-timeout').value) || 300
             };
@@ -383,6 +398,7 @@
 
         document.getElementById('btn-test-openrouter').onclick = (e) => { e.preventDefault(); testConnection(); };
         document.getElementById('btn-test-ollama').onclick = (e) => { e.preventDefault(); testConnection(); };
+        document.getElementById('btn-test-groq').onclick = (e) => { e.preventDefault(); testConnection(); };
 
         async function clearAllData() {
             if (confirm('DANGER: This will delete everything. Proceed?')) {

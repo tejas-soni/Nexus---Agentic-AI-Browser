@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (chatModelSelect) {
                     const savedSettings = await window.nexus.settings.get();
                     const provider = savedSettings.provider || 'openrouter';
-                    const targetModel = provider === 'openrouter' ? savedSettings.openrouterModel : (provider === 'ollama' ? savedSettings.ollamaModel : savedSettings.pollinationsModel);
+                    const targetModel = provider === 'openrouter' ? savedSettings.openrouterModel : (provider === 'ollama' ? savedSettings.ollamaModel : (provider === 'groq' ? savedSettings.groqModel : savedSettings.pollinationsModel));
                     
                     chatModelSelect.innerHTML = availableModels.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
                     
@@ -84,6 +84,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (provider === 'openrouter') settings.openrouterModel = e.target.value;
             else if (provider === 'ollama') settings.ollamaModel = e.target.value;
             else if (provider === 'pollinations') settings.pollinationsModel = e.target.value;
+            else if (provider === 'groq') settings.groqModel = e.target.value;
             await window.nexus.settings.save(settings);
             console.log(`[NEXUS:UI] Model selection saved natively.`);
         });

@@ -45,6 +45,9 @@ class SettingsService extends Service {
             models = await llmRouter.fetchOllamaModels(settings.ollamaBaseUrl || 'http://localhost:11434');
         } else if (provider === 'pollinations') {
             models = await llmRouter.fetchPollinationsModels();
+        } else if (provider === 'groq') {
+            if (!settings.groqApiKey) throw new Error('Groq API key is missing.');
+            models = await llmRouter.fetchGroqModels(settings.groqApiKey);
         }
 
         if (models.length > 0) {
@@ -126,6 +129,10 @@ class SettingsService extends Service {
                 } else if (provider === 'pollinations') {
                     const models = await this.refreshProviderModels(settings);
                     result = { success: true, message: `Pollinations API is reachable. ${models.length} models found.` };
+                } else if (provider === 'groq') {
+                    if (!settings.groqApiKey) throw new Error('Please enter a Groq API key first.');
+                    const models = await this.refreshProviderModels(settings);
+                    result = { success: true, message: `Groq connection verified. ${models.length} ultra-fast models found.` };
                 }
 
                 this.send('updated', {

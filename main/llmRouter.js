@@ -401,8 +401,106 @@ async function fetchPollinationsModels() {
     req.end();
   });
 }
+// ─── Groq AI ───────────────────────────────────────────────────────────────
 
-// ─── Unified Stream ───────────────────────────────────────────────────────────
+/**
+ * Stream chat completions from Groq.
+ */
+function streamGroq({ apiKey, model, messages, onChunk, onDone, onError }) {
+  const body = JSON.stringify({
+    model: model || 'llama3-70b-8192',
+    messages,
+    stream: true,
+  });
+
+  const options = {
+    hostname: 'api.groq.com',
+    path: '/openai/v1/chat/completions',
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'Nexus-Browser/1.0',
+      'Content-Length': Buffer.byteLength(body),
+    },
+  };
+
+  const req = https.request(options, (res) => {
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      onError(new Error(`Groq rejected request with status ${res.statusCode}. Check your API key.`));
+      return;
+    }
+    
+    let buffer = '';
+    res.on('data', (chunk) => {
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed === 'data: [DONE]') continue;
+        if (!trimmed.startsWith('data: ')) continue;
+
+        try {
+          const json = JSON.parse(trimmed.slice(6));
+          const delta = json.choices?.[0]?.delta?.content;
+          if (delta) onChunk(delta);
+        } catch (_) {}
+      }
+    });
+
+    res.on('end', () => onDone());
+    res.on('error', onError);
+  });
+
+  req.on('error', onError);
+  req.write(body);
+  req.end();
+
+  return () => req.destroy();
+}
+
+/**
+ * Fetch available models from Groq.
+ */
+async function fetchGroqModels(apiKey) {
+  if (!apiKey) throw new Error('API key is required for Groq');
+
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'api.groq.com',
+      path: '/openai/v1/models',
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'User-Agent': 'Nexus-Browser/1.0',
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', (d) => (body += d));
+      res.on('end', () => {
+        if (res.statusCode !== 200) return reject(new Error(`Groq returned status ${res.statusCode}`));
+        try {
+          const json = JSON.parse(body);
+          const models = (json.data || []).map(m => ({
+            id: m.id,
+            name: m.id,
+            context: 8192 // Groq typical context
+          }));
+          resolve(models);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.end();
+  });
+}
 
 /**
  * Route a stream request to the correct provider.
@@ -441,14 +539,23 @@ function streamLLM({ settings, messages, model, onChunk, onDone, onError }) {
       onError,
     });
   } else if (provider === 'pollinations') {
-      return streamPollinations({
-        apiKey: settings.pollinationsApiKey,
-        model: targetModel || 'openai',
-        messages,
-        onChunk,
-        onDone,
-        onError,
-      });
+    return streamPollinations({
+      apiKey: settings.pollinationsApiKey,
+      model: targetModel || 'openai',
+      messages,
+      onChunk,
+      onDone,
+      onError,
+    });
+  } else if (provider === 'groq') {
+    return streamGroq({
+      apiKey: settings.groqApiKey,
+      model: targetModel || 'llama3-70b-8192',
+      messages,
+      onChunk,
+      onDone,
+      onError,
+    });
   } else {
     onError(new Error(`Unknown provider: ${provider}`));
   }
@@ -462,5 +569,6 @@ module.exports = {
   fetchOpenRouterModels,
   fetchOllamaModels,
   fetchPollinationsModels,
+  fetchGroqModels,
   pingOllama,
 };
