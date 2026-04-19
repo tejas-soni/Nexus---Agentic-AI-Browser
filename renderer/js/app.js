@@ -794,7 +794,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Clean up old state
                 currentStreamText = '';
                 activeChatId = 'chat-' + Date.now();
-                nexusLog(`TRACE: Initializing session: ${activeChatId}`);
+                console.log(`TRACE: Initializing session: ${activeChatId}`);
                 
                 addMessage('user', text);
                 const aiMsg = addMessage('ai', 'Thinking...');
@@ -806,7 +806,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (send) send.classList.add('hidden');
 
                 if (contextEnabled) {
-                    nexusLog('TRACE: Context enabled. Fetching snapshot...');
+                    console.log('TRACE: Context enabled. Fetching snapshot...');
                     const snap = await window.nexus.tabs.getSnapshot();
                     if (snap && snap.success && snap.snapshot) {
                         sessionMessages.push({ role: 'system', content: `CRITICAL CONTEXT: You are looking at the page "${snap.snapshot.title}". URL: ${snap.snapshot.url}. Here is the distilled summary of the page: ${snap.snapshot.summary}` });
@@ -817,22 +817,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const modelSelect = document.getElementById('chat-model-select');
                 let model = modelSelect?.value;
-                nexusLog(`TRACE: Selected model from UI: ${model || 'DEFAULT'}`);
+                console.log(`TRACE: Selected model from UI: ${model || 'DEFAULT'}`);
                 
                 // Final safety: if model is empty string (Loading/Offline), fallback to settings
                 if (!model) {
-                    nexusLog('TRACE: Model is empty, fetching native settings fallback...');
+                    console.log('TRACE: Model is empty, fetching native settings fallback...');
                     const currentSettings = await window.nexus.settings.get();
                     const provider = currentSettings.provider || 'openrouter';
                     model = provider === 'openrouter' ? currentSettings.openrouterModel : (provider === 'ollama' ? currentSettings.ollamaModel : currentSettings.pollinationsModel);
-                    nexusLog(`TRACE: Fallback model resolved: ${model}`);
+                    console.log(`TRACE: Fallback model resolved: ${model}`);
                 }
 
-                nexusLog(`TRACE: Dispatching stream request to IPC bridge for ${activeChatId}...`);
-                window.nexus.llm.stream(activeChatId, sessionMessages, model);
-                nexusLog('TRACE: IPC stream call dispatched successfully.');
+                const currentSettings = await window.nexus.settings.get();
+                const ignitionDelay = currentSettings.timeout || 300;
+
+                setTimeout(() => {
+                    console.log(`TRACE: Dispatching stream request to IPC bridge for ${activeChatId}...`);
+                    window.nexus.llm.stream(activeChatId, sessionMessages, model);
+                    console.log('TRACE: IPC stream call dispatched successfully.');
+                }, ignitionDelay);
             } catch (err) {
-                nexusLog(`TRACE: FATAL ERROR in processChat: ${err.message}`);
+                console.log(`TRACE: FATAL ERROR in processChat: ${err.message}`);
                 console.error('[NEXUS:UI] processChat failed:', err);
                 showToast(`Chat Error: ${err.message}`, 'danger');
                 if (send) send.classList.remove('hidden');
@@ -877,14 +882,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="agent-card" id="agent-${a.id}">
                     <div class="agent-card__header">
                         <div class="agent-card__avatar">${a.emoji || '🤖'}</div>
-                        <div class="agent-card__info"><div class="agent-card__name">${a.name}</div><div class="agent-card__desc">${a.description || ''}</div></div>
+                        <div class="agent-card__info">
+                            <div class="agent-card__name">${a.name}</div>
+                            <div class="agent-card__desc">${a.description || ''}</div>
+                        </div>
                     </div>
                     <div class="agent-card__actions">
                         <button class="btn btn-primary btn-sm btn-run" data-id="${a.id}">Run</button>
                         <button class="btn btn-danger btn-sm btn-stop hidden" id="stop-${a.id}" data-id="${a.id}">Stop</button>
                         <button class="btn btn-ghost btn-sm btn-edit" data-id="${a.id}">Edit</button>
                         <button class="btn btn-danger btn-sm btn-delete" data-id="${a.id}">Delete</button>
-                    </div>
                     </div>
                     <div class="agent-log hidden" id="log-${a.id}"></div>
                     <div class="agent-interaction hidden" id="interaction-${a.id}" style="margin-top: 8px; display: flex; gap: 8px;">
@@ -928,10 +935,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             const stopBtn = document.getElementById(`stop-${agentId}`);
             const runBtn = card?.querySelector('.btn-run');
             const interaction = document.getElementById(`interaction-${agentId}`);
+            const logContainer = document.getElementById(`log-${agentId}`);
+
             if (card) card.classList.remove('running');
             if (stopBtn) stopBtn.classList.add('hidden');
             if (runBtn) runBtn.classList.remove('hidden');
             if (interaction) interaction.classList.add('hidden');
+            
+            if (logContainer) {
+                logContainer.classList.remove('hidden');
+                const errEl = document.createElement('div');
+                errEl.className = 'agent-log__step agent-log__step--error';
+                errEl.innerText = `FATAL ERROR: ${error}`;
+                logContainer.appendChild(errEl);
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
         });
 
         load();
@@ -978,22 +996,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         const model = agent.model || (availableModels[0] ? availableModels[0].id : null);
-        nexusLog(`Running Agent: ${agent.name} with model: ${model}`);
+        console.log(`Running Agent: ${agent.name} with model: ${model}`);
         
         const card = document.getElementById(`agent-${id}`);
         const stopBtn = document.getElementById(`stop-${id}`);
         const runBtn = card?.querySelector('.btn-run');
         const interaction = document.getElementById(`interaction-${id}`);
-        if (card) {
-            card.classList.add('running');
-            const log = document.getElementById(`log-${id}`);
-            if (log) { log.innerHTML = ''; log.classList.remove('hidden'); }
-        }
+        const log = document.getElementById(`log-${id}`);
+
+        if (card) card.classList.add('running');
+        if (log) { log.innerHTML = ''; log.classList.remove('hidden'); }
         if (stopBtn) stopBtn.classList.remove('hidden');
         if (runBtn) runBtn.classList.add('hidden');
         if (interaction) {
             interaction.classList.remove('hidden');
-            document.getElementById(`instruct-input-${id}`).focus();
+            const instructInput = document.getElementById(`instruct-input-${id}`);
+            if (instructInput) instructInput.focus();
         }
 
         showToast(`Agent ${agent.name} started running...`, 'success');

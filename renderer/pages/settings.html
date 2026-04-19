@@ -7,13 +7,18 @@
     <link rel="stylesheet" href="../css/layout.css">
     <link rel="stylesheet" href="../css/components.css">
     <style>
-        body {
+        html, body {
+            height: auto !important;
+            overflow-y: auto !important;
             background-color: var(--bg-base);
+        }
+        body {
             color: var(--text-primary);
             padding: 40px;
             max-width: 900px;
             margin: 0 auto;
             animation: fade-in 0.4s ease-out;
+            min-height: 100vh;
         }
         .settings-header {
             margin-bottom: 40px;
@@ -193,6 +198,14 @@
                         </div>
                     </div>
 
+                    <div class="setting-item">
+                        <div class="setting-label">AI Ignition Delay (ms)</div>
+                        <div class="setting-description">Delay before triggering AI requests. Helps avoid rate limits. (Default: 300)</div>
+                        <div class="setting-control">
+                            <input class="input" type="number" id="set-timeout" min="0" max="10000" step="100">
+                        </div>
+                    </div>
+ 
                     <div id="group-openrouter" class="setting-item">
                         <div class="setting-label">OpenRouter API Key</div>
                         <div class="setting-description">Required for high-performance cloud models.</div>
@@ -274,6 +287,7 @@
             document.getElementById('set-provider').value = s.provider || 'openrouter';
             document.getElementById('set-openrouterApiKey').value = s.openrouterApiKey || '';
             document.getElementById('set-ollamaBaseUrl').value = s.ollamaBaseUrl || 'http://localhost:11434';
+            document.getElementById('set-timeout').value = s.timeout || 300;
             
             updateProviderGroups();
         }
@@ -297,7 +311,8 @@
                 theme: document.getElementById('set-theme').value,
                 provider: document.getElementById('set-provider').value,
                 openrouterApiKey: document.getElementById('set-openrouterApiKey').value,
-                ollamaBaseUrl: document.getElementById('set-ollamaBaseUrl').value
+                ollamaBaseUrl: document.getElementById('set-ollamaBaseUrl').value,
+                timeout: parseInt(document.getElementById('set-timeout').value) || 300
             };
 
             try {

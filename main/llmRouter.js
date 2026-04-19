@@ -34,6 +34,7 @@ function streamOpenRouter({ apiKey, model, messages, onChunk, onDone, onError })
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 NexusBrowser/1.0',
       'HTTP-Referer': 'https://nexus-browser.app',
       'X-Title': 'Nexus Browser',
       'Content-Length': Buffer.byteLength(body),
@@ -42,8 +43,13 @@ function streamOpenRouter({ apiKey, model, messages, onChunk, onDone, onError })
 
   const req = https.request(options, (res) => {
     if (res.statusCode < 200 || res.statusCode >= 300) {
+      let msg = `AI Provider rejected request with status ${res.statusCode}.`;
+      if (res.statusCode === 429) msg = "Rate Limited (429): Too many requests. Please wait a moment or try a different model.";
+      else if (res.statusCode === 401) msg = "Authentication Error (401): Invalid or missing API key. Check your settings.";
+      else if (res.statusCode === 404) msg = `Model not found (404): The selected model "${model}" is unavailable.`;
+      
       console.error(`[NEXUS:MAIN] OpenRouter HTTP Error: ${res.statusCode}`);
-      onError(new Error(`AI Provider rejected request with status ${res.statusCode}. Check your API settings.`));
+      onError(new Error(msg));
       return;
     }
     
@@ -176,8 +182,12 @@ function streamOllama({ baseUrl, model, messages, onChunk, onDone, onError }) {
 
   const req = lib.request(options, (res) => {
     if (res.statusCode < 200 || res.statusCode >= 300) {
+      let msg = `Ollama rejected request with status ${res.statusCode}.`;
+      if (res.statusCode === 404) msg = `Model not found (404): Ensure you have pulled "${model}" in Ollama (\`ollama pull ${model}\`).`;
+      else if (res.statusCode === 503) msg = "Ollama is overloaded or initialising. Please try again in a few seconds.";
+
       console.error(`[NEXUS:MAIN] Ollama HTTP Error: ${res.statusCode}`);
-      onError(new Error(`Ollama rejected request with status ${res.statusCode}. Ensure Ollama is running and the model is pulled.`));
+      onError(new Error(msg));
       return;
     }
 

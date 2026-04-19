@@ -334,7 +334,11 @@ function runAgent({ agentId, agentName, agentDescription, task, model, settings,
     });
   };
 
-  executeNextStep();
+  // Start the loop with a small delay to avoid "burst" behavior that triggers anti-bot filters
+  const ignitionDelay = settings.timeout || 300;
+  setTimeout(() => {
+    if (!aborted) executeNextStep();
+  }, ignitionDelay);
 
   return {
     abort: () => {
