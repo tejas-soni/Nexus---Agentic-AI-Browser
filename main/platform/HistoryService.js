@@ -61,11 +61,16 @@ class HistoryService extends Service {
         this.handle('add', async (event, { title, url, favicon }) => {
             if (!url || url.startsWith('nexus://') || url.startsWith('about:')) return;
             
+            this.log(`Recording navigation: ${title} (${url})`);
             return new Promise((resolve, reject) => {
                 const stmt = this.db.prepare('INSERT INTO history (title, url, favicon) VALUES (?, ?, ?)');
                 stmt.run(title, url, favicon, function(err) {
-                    if (err) reject(err);
-                    else resolve({ id: this.lastID });
+                    if (err) {
+                        console.error('[NEXUS:HISTORY] DB Insert Error:', err);
+                        reject(err);
+                    } else {
+                        resolve({ id: this.lastID });
+                    }
                 });
                 stmt.finalize();
             });

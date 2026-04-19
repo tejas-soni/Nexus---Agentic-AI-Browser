@@ -134,41 +134,53 @@
     </div>
 
     <script>
-        const { nexus } = window;
         const grid = document.getElementById('bookmark-grid');
 
-        async function load() {
-            const bms = await nexus.bookmarks.get();
-            if (bms.length === 0) {
-                grid.innerHTML = '<div class="empty-state">No bookmarks saved yet.</div>';
-                return;
-            }
+        function sendIPC(action, data) {
+            return new Promise((resolve) => {
+                const reqId = Date.now().toString() + Math.random();
+                window._ipcCallbacks = window._ipcCallbacks || {};
+                window._ipcCallbacks[reqId] = resolve;
+                console.log('NEXUS_IPC:' + JSON.stringify({ action, data, reqId }));
+            });
+        }
 
-            grid.innerHTML = bms.map(bm => `
-                <div class="bookmark-card-wrapper" style="position:relative">
-                    <a class="bookmark-card" href="${bm.url}">
-                        <div class="card-top">
-                            <div class="card-favicon">${bm.favicon ? '<img src="'+bm.favicon+'" style="width:16px;height:16px;">' : '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>'}</div>
-                            <div class="card-title">${bm.title || 'Untitled'}</div>
-                        </div>
-                        <div class="card-url">${bm.url}</div>
-                    </a>
-                    <button class="btn-remove" onclick="removeBm('${bm.id}', event)">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                    </button>
-                </div>
-            `).join('');
+        async function load() {
+            try {
+                const bms = await sendIPC('bookmarks.get');
+                if (bms.length === 0) {
+                    grid.innerHTML = '<div class="empty-state">No bookmarks saved yet.</div>';
+                    return;
+                }
+
+                grid.innerHTML = bms.map(bm => `
+                    <div class="bookmark-card-wrapper" style="position:relative">
+                        <a class="bookmark-card" href="${bm.url}">
+                            <div class="card-top">
+                                <div class="card-favicon">${bm.favicon ? '<img src="'+bm.favicon+'" style="width:16px;height:16px;">' : '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>'}</div>
+                                <div class="card-title">${bm.title || 'Untitled'}</div>
+                            </div>
+                            <div class="card-url">${bm.url}</div>
+                        </a>
+                        <button class="btn-remove" onclick="removeBm('${bm.id}', event)">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                `).join('');
+            } catch (err) {
+                grid.innerHTML = `<div class="empty-state" style="color:var(--error)">Error loading bookmarks: ${err.message}</div>`;
+            }
         }
 
         window.removeBm = async (id, e) => {
             e.preventDefault();
             e.stopPropagation();
-            await nexus.bookmarks.remove(id);
+            await sendIPC('bookmarks.remove', id);
             load();
         };
 
         window.importBms = async () => {
-            const res = await nexus.bookmarks.import();
+            const res = await sendIPC('bookmarks.import');
             if (res.success) {
                 alert('Imported ' + res.count + ' bookmarks.');
                 load();
@@ -176,7 +188,7 @@
         };
 
         window.exportBms = async () => {
-            const res = await nexus.bookmarks.export();
+            const res = await sendIPC('bookmarks.export');
             if (res.success) {
                 alert('Bookmarks exported to ' + res.path);
             }

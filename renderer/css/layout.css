@@ -441,6 +441,11 @@ body.is-fullscreen .addressbar {
   pointer-events: none;
 }
 .addressbar__btn svg { width: 16px; height: 16px; }
+.addressbar__btn.active svg {
+  fill: var(--accent);
+  color: var(--accent);
+  filter: drop-shadow(0 0 4px var(--accent-subtle));
+}
 
 .addressbar__url {
   flex: 1;

@@ -153,7 +153,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         navItems: document.querySelectorAll('.sidebar__item'),
         panelSections: document.querySelectorAll('.panel-section'),
         closeBtns: document.querySelectorAll('.panel-header__close'),
-        toastContainer: document.getElementById('toast-container')
+        toastContainer: document.getElementById('toast-container'),
+        btnBookmark: document.getElementById('btn-bookmark')
     };
 
     // ─── Nexus Shields Logic ──────────────────────────────────────
@@ -451,7 +452,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                     updateNavButtons(webview);
                 }
-                window.nexus.history.add({ title: tab.title, url: tab.url, favicon: tab.favicon });
+                
+                // History hardening: ensure we use the definitive values from the webview
+                const finalTitle = webview.getTitle();
+                const finalUrl = webview.getURL();
+                window.nexus.history.add({ title: finalTitle, url: finalUrl, favicon: tab.favicon });
+
+                // Update bookmark status on navigation
+                if (state.activeTabId === tabId) {
+                    updateBookmarkStatus(finalUrl);
+                }
             }
         });
         webview.addEventListener('page-title-updated', (e) => {
@@ -494,8 +504,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (req.action === 'settings.get') res = await window.nexus.settings.get();
                     else if (req.action === 'settings.save') res = await window.nexus.settings.save(req.data);
                     else if (req.action === 'settings.testConnection') res = await window.nexus.settings.testConnection();
+                    
+                    else if (req.action === 'history.get') res = await window.nexus.history.get(req.data);
+                    else if (req.action === 'history.add') res = await window.nexus.history.add(req.data);
+                    else if (req.action === 'history.remove') res = await window.nexus.history.remove(req.data);
                     else if (req.action === 'history.clear') res = await window.nexus.history.clear();
+                    
+                    else if (req.action === 'bookmarks.get') res = await window.nexus.bookmarks.get(req.data);
+                    else if (req.action === 'bookmarks.add') res = await window.nexus.bookmarks.add(req.data);
+                    else if (req.action === 'bookmarks.remove') res = await window.nexus.bookmarks.remove(req.data);
                     else if (req.action === 'bookmarks.clear') res = await window.nexus.bookmarks.clear();
+                    else if (req.action === 'bookmarks.import') res = await window.nexus.bookmarks.import();
+                    else if (req.action === 'bookmarks.export') res = await window.nexus.bookmarks.export();
                     
                     const safeRes = JSON.stringify(res || {}).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/'/g, "\\'");
                     webview.executeJavaScript(`if(window._ipcCallbacks && window._ipcCallbacks["${req.reqId}"]) { window._ipcCallbacks["${req.reqId}"](JSON.parse('${safeRes}')); delete window._ipcCallbacks["${req.reqId}"]; }`).catch(console.error);
@@ -520,6 +540,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 elements.urlInput.value = (tab.url === 'nexus://newtab' || tab.url === 'nexus://newtab/') ? '' : tab.url;
             }
             updateNavButtons(webview);
+            updateBookmarkStatus(webview.getURL());
         }
     }
 
@@ -578,6 +599,53 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         webview.src = url;
         switchTab(tab.id);
+    }
+
+    async function updateBookmarkStatus(url) {
+        if (!elements.btnBookmark || !url) return;
+        if (url.startsWith('nexus://') || url.startsWith('about:')) {
+            elements.btnBookmark.classList.remove('active');
+            return;
+        }
+
+        const bookmarks = await window.nexus.bookmarks.get();
+        const isBookmarked = bookmarks.some(b => b.url === url);
+        
+        if (isBookmarked) {
+            elements.btnBookmark.classList.add('active');
+            elements.btnBookmark.title = 'Remove bookmark';
+        } else {
+            elements.btnBookmark.classList.remove('active');
+            elements.btnBookmark.title = 'Bookmark this page';
+        }
+    }
+
+    if (elements.btnBookmark) {
+        elements.btnBookmark.onclick = async () => {
+            const tab = state.tabs.find(t => t.id === state.activeTabId);
+            const webview = document.getElementById(`webview-${tab.id}`);
+            if (tab && webview) {
+                const title = webview.getTitle() || tab.title || 'Untitled';
+                const url = webview.getURL() || tab.url;
+                
+                if (url.startsWith('nexus://') || url.startsWith('about:')) {
+                    showToast('Cannot bookmark internal pages', 'warning');
+                    return;
+                }
+
+                const bookmarks = await window.nexus.bookmarks.get();
+                const existing = bookmarks.find(b => b.url === url);
+
+                if (existing) {
+                    await window.nexus.bookmarks.remove(existing.id);
+                    showToast('Bookmark removed', 'info');
+                } else {
+                    await window.nexus.bookmarks.add({ title, url, favicon: tab.favicon });
+                    showToast('Page bookmarked!', 'success');
+                }
+                updateBookmarkStatus(url);
+            }
+        };
     }
 
     elements.btnBack.onclick = () => { const wv = document.getElementById(`webview-${state.activeTabId}`); if (wv) wv.goBack(); };
