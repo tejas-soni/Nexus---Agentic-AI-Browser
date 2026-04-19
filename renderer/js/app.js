@@ -23,7 +23,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         activeTabId: null,
         activePanel: 'home',
         isSidebarExpanded: settings.sidebarExpanded !== false,
-        settings: settings
+        settings: settings,
+        closedTabs: []
     };
 
     // Diagnostic: Check Bookmarks state on load
@@ -355,11 +356,76 @@ document.addEventListener('DOMContentLoaded', async () => {
         elements.sidebarToggle.onclick = () => setSidebarExpanded(!state.isSidebarExpanded);
     }
 
-    // Sidebar Toggle Shortcut
+    // ─── Keyboard Shortcuts ─────────────────────────────────────────
     window.addEventListener('keydown', (e) => {
+        // Toggle Sidebar: Ctrl+B
         if (e.ctrlKey && (e.key === 'b' || e.key === 'B')) {
             e.preventDefault();
             if (elements.sidebarToggle) elements.sidebarToggle.click();
+        }
+        
+        // New Tab: Ctrl+T
+        if (e.ctrlKey && !e.shiftKey && (e.key === 't' || e.key === 'T')) {
+            e.preventDefault();
+            createTab();
+        }
+
+        // Reopen Closed Tab: Ctrl+Shift+T
+        if (e.ctrlKey && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+            e.preventDefault();
+            if (state.closedTabs.length > 0) {
+                const last = state.closedTabs.pop();
+                createTab(last.url);
+                showToast(`Restoring: ${last.title || 'Previous Tab'}`, 'success');
+            } else {
+                showToast('No more closed tabs to restore', 'info');
+            }
+        }
+
+        // Close Tab: Ctrl+W
+        if (e.ctrlKey && (e.key === 'w' || e.key === 'W')) {
+            e.preventDefault();
+            closeTab(state.activeTabId);
+        }
+
+        // Reload: Ctrl+R or F5
+        if ((e.ctrlKey && (e.key === 'r' || e.key === 'R')) || e.key === 'F5') {
+            e.preventDefault();
+            const wv = document.getElementById(`webview-${state.activeTabId}`);
+            if (wv) {
+                wv.reload();
+                showToast('Reloading...', 'info');
+            } else {
+                const tab = state.tabs.find(t => t.id === state.activeTabId);
+                if (tab && (tab.url === 'nexus://newtab' || tab.url === 'nexus://newtab/')) {
+                    showToast('Reloading New Tab...', 'info');
+                }
+            }
+        }
+
+        // History: Ctrl+H
+        if (e.ctrlKey && (e.key === 'h' || e.key === 'H')) {
+            e.preventDefault();
+            closeAllPanels();
+            navigateTo('nexus://history');
+            updateSidebarActive('history');
+        }
+
+        // Bookmarks: Ctrl+Shift+O
+        if (e.ctrlKey && e.shiftKey && (e.key === 'o' || e.key === 'O')) {
+            e.preventDefault();
+            closeAllPanels();
+            navigateTo('nexus://bookmarks');
+            updateSidebarActive('bookmarks');
+        }
+
+        // Focus URL Bar: Ctrl+L or Alt+D
+        if ((e.ctrlKey && (e.key === 'l' || e.key === 'L')) || (e.altKey && (e.key === 'd' || e.key === 'D'))) {
+            e.preventDefault();
+            if (elements.urlInput) {
+                elements.urlInput.focus();
+                elements.urlInput.select();
+            }
         }
     });
 
@@ -556,6 +622,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (e) e.stopPropagation();
         const index = state.tabs.findIndex(t => t.id === id);
         if (index === -1) return;
+
+        const closedTab = state.tabs[index];
+        if (closedTab && closedTab.url !== 'nexus://newtab') {
+            state.closedTabs.push({ 
+                url: closedTab.url, 
+                title: closedTab.title, 
+                favicon: closedTab.favicon 
+            });
+            // Keep only the last 15 closed tabs
+            if (state.closedTabs.length > 15) state.closedTabs.shift();
+        }
+
         state.tabs.splice(index, 1);
         const webview = document.getElementById(`webview-${id}`);
         if (webview) webview.remove();
@@ -1250,5 +1328,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Call init routines
     initImageGen();
 
+
+    function updateSidebarActive(panelId) {
+        elements.navItems.forEach(item => {
+            if (item.getAttribute('data-panel') === panelId) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+    }
 
 }); // Real End of DOMContentLoaded
