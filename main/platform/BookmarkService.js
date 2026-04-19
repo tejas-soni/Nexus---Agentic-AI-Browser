@@ -15,7 +15,7 @@ class BookmarkService extends Service {
     }
 
     async init() {
-        this.log('Initializing Bookmarks database...');
+        this.log(`Initializing Bookmarks database at: ${path.join(app.getPath('userData'), 'nexus_bookmarks.db')}`);
         
         return new Promise((resolve, reject) => {
             this.db.serialize(() => {
@@ -29,10 +29,19 @@ class BookmarkService extends Service {
                     )
                 `, (err) => {
                     if (err) {
+                        this.log(`Database creation error: ${err.message}`);
                         reject(err);
                     } else {
                         this.setupHandlers();
-                        this.migrateOldBookmarks().then(resolve).catch(resolve);
+                        this.migrateOldBookmarks()
+                            .then(() => {
+                                this.log('Initialization complete.');
+                                resolve();
+                            })
+                            .catch((err) => {
+                                this.log('Initialization finished with migration errors: ' + err.message);
+                                resolve(); // Still resolve so browser can start
+                            });
                     }
                 });
             });
@@ -43,15 +52,17 @@ class BookmarkService extends Service {
         try {
             const oldBms = getOldBookmarks();
             if (oldBms && oldBms.length > 0) {
-                this.log(`Migrating ${oldBms.length} legacy bookmarks...`);
+                this.log(`ATTENTION: Found ${oldBms.length} legacy bookmarks to migrate.`);
                 for (const bm of oldBms) {
+                    this.log(`Migrating legacy bookmark: ${bm.url}`);
                     await this.addInDb(bm);
                 }
-                // We don't delete old bookmarks from storage.js yet to be safe, 
-                // but they won't be used anymore.
+                this.log('Migration sequence finished.');
+            } else {
+                this.log('No legacy bookmarks found in electron-store.');
             }
         } catch (e) {
-            this.log(`Migration skipped or failed: ${e.message}`);
+            this.log(`Migration critical failure: ${e.message}`);
         }
     }
 
@@ -68,7 +79,8 @@ class BookmarkService extends Service {
 
     setupHandlers() {
         this.handle('get', async (event, options) => {
-            const { limit = 500, search = '' } = options || {};
+            let { limit = 500, search = '' } = options || {};
+            search = (search || '').trim();
             this.log(`Received fetch request (search: "${search}", limit: ${limit})`);
             
             return new Promise((resolve, reject) => {
@@ -112,6 +124,20 @@ class BookmarkService extends Service {
                 this.db.run('DELETE FROM bookmarks WHERE id = ?', [id], (err) => {
                     if (err) {
                         console.error('[NEXUS:BOOKMARKS] DB Remove Error:', err);
+                        reject(err);
+                    } else {
+                        resolve({ success: true });
+                    }
+                });
+            });
+        });
+
+        this.handle('clear', async () => {
+            this.log('Clearing all bookmarks...');
+            return new Promise((resolve, reject) => {
+                this.db.run('DELETE FROM bookmarks', (err) => {
+                    if (err) {
+                        console.error('[NEXUS:BOOKMARKS] DB Clear Error:', err);
                         reject(err);
                     } else {
                         resolve({ success: true });

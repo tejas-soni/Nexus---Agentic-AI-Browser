@@ -87,6 +87,7 @@ contextBridge.exposeInMainWorld('nexus', {
     get: () => ipcRenderer.invoke('bookmarks:get'),
     add: (bookmark) => ipcRenderer.invoke('bookmarks:add', bookmark),
     remove: (id) => ipcRenderer.invoke('bookmarks:remove', id),
+    clear: () => ipcRenderer.invoke('bookmarks:clear'),
     import: () => ipcRenderer.invoke('bookmarks:import'),
     export: () => ipcRenderer.invoke('bookmarks:export'),
   },

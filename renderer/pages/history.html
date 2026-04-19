@@ -246,7 +246,14 @@
             }
         };
 
-        searchInput.oninput = () => loadHistory();
+        let searchTimeout;
+        searchInput.oninput = () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                console.log('[DEBUG:UI] Executing search:', searchInput.value);
+                loadHistory();
+            }, 150);
+        };
 
         // Initial load
         loadHistory();

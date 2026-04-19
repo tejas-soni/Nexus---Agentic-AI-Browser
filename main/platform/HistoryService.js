@@ -38,7 +38,11 @@ class HistoryService extends Service {
     }
 
     setupHandlers() {
-        this.handle('get', async (event, { limit = 100, search = '' } = {}) => {
+        this.handle('get', async (event, options) => {
+            let { limit = 100, search = '' } = options || {};
+            search = (search || '').trim();
+            this.log(`Received fetch request (search: "${search}", limit: ${limit})`);
+            
             return new Promise((resolve, reject) => {
                 let query = 'SELECT * FROM history';
                 let params = [];
@@ -51,9 +55,16 @@ class HistoryService extends Service {
                 query += ' ORDER BY timestamp DESC LIMIT ?';
                 params.push(limit);
 
+                this.log(`SQL: ${query} | Params: ${JSON.stringify(params)}`);
+
                 this.db.all(query, params, (err, rows) => {
-                    if (err) reject(err);
-                    else resolve(rows);
+                    if (err) {
+                        console.error('[NEXUS:HISTORY] DB Fetch Error:', err);
+                        reject(err);
+                    } else {
+                        this.log(`Found ${rows.length} history items`);
+                        resolve(rows);
+                    }
                 });
             });
         });

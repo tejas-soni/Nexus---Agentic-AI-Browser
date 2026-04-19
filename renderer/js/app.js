@@ -26,6 +26,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         settings: settings
     };
 
+    // Diagnostic: Check Bookmarks state on load
+    try {
+        const bms = await window.nexus.bookmarks.get();
+        console.log(`[DEBUG:DB] Bookmarks detected in SQLite: ${bms.length}`);
+    } catch (e) {
+        console.warn('[DEBUG:DB] Could not verify bookmarks state:', e.message);
+    }
+
     let availableModels = [];
     let processChat;
 
@@ -517,8 +525,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     else if (req.action === 'bookmarks.import') res = await window.nexus.bookmarks.import();
                     else if (req.action === 'bookmarks.export') res = await window.nexus.bookmarks.export();
                     
-                    const safeRes = JSON.stringify(res || {}).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/'/g, "\\'");
-                    webview.executeJavaScript(`if(window._ipcCallbacks && window._ipcCallbacks["${req.reqId}"]) { window._ipcCallbacks["${req.reqId}"](JSON.parse('${safeRes}')); delete window._ipcCallbacks["${req.reqId}"]; }`).catch(console.error);
+                    const safeRes = btoa(unescape(encodeURIComponent(JSON.stringify(res || {}))));
+                    webview.executeJavaScript(`if(window._ipcCallbacks && window._ipcCallbacks["${req.reqId}"]) { window._ipcCallbacks["${req.reqId}"](JSON.parse(decodeURIComponent(escape(atob("${safeRes}"))))); delete window._ipcCallbacks["${req.reqId}"]; }`).catch(console.error);
                 } catch (err) {
                     console.error('[NEXUS:IPC-Tunnel] Error:', err);
                 }
