@@ -71,6 +71,9 @@ Nexus is a powerful, privacy-first desktop browser designed for the era of Agent
    npm run dev
    ```
 
+### ✨ First Run Setup
+On your first launch (or after a **Fresh Start**), Nexus will automatically open a **Setup Wizard**. This guide will help you connect to your preferred AI provider, test your connection, and accept the terms of service to initialize your professional workspace.
+
 ---
 
 ## ⚙️ Configuration

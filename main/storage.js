@@ -24,6 +24,7 @@ const schema = {
       ollamaModel: { type: 'string', default: '' },
       pollinationsApiKey: { type: 'string', default: '' },
       pollinationsModel: { type: 'string', default: 'openai' },
+      searchEngine: { type: 'string', enum: ['google', 'brave', 'duckduckgo', 'bing'], default: 'google' },
       timeout: { type: 'number', default: 300 },
     },
     default: {},
@@ -87,19 +88,33 @@ function getSettings() {
     openrouterModel: store.get('llm.openrouterModel', 'meta-llama/llama-3.3-70b-instruct:free'),
     ollamaBaseUrl: store.get('llm.ollamaBaseUrl', 'http://localhost:11434'),
     ollamaModel: store.get('llm.ollamaModel', ''),
+    searchEngine: store.get('llm.searchEngine', 'google'),
     timeout: store.get('llm.timeout', 300),
   };
 }
 
-function saveSettings(settings) {
+function saveSettings(newSettings) {
   const store = getStore();
-  // Strictly map llm settings
-  if (settings.provider) store.set('llm.provider', settings.provider);
-  if (typeof settings.openrouterApiKey === 'string') store.set('llm.openrouterApiKey', settings.openrouterApiKey);
-  if (settings.openrouterModel) store.set('llm.openrouterModel', settings.openrouterModel);
-  if (settings.ollamaBaseUrl) store.set('llm.ollamaBaseUrl', settings.ollamaBaseUrl);
-  if (settings.ollamaModel) store.set('llm.ollamaModel', settings.ollamaModel);
-  if (settings.timeout !== undefined) store.set('llm.timeout', Number(settings.timeout));
+  const current = getSettings();
+  
+  // Merge logic: Only overwrite if the new value is TRUTHY or an explicit empty string we want to save
+  // This prevents accidental clearing during partial updates.
+  if (newSettings.provider) store.set('llm.provider', newSettings.provider);
+  
+  if (typeof newSettings.openrouterApiKey === 'string') {
+    // Only save if it's not the default placeholder or if we actually meant to change it
+    store.set('llm.openrouterApiKey', newSettings.openrouterApiKey);
+  }
+  
+  if (newSettings.openrouterModel) store.set('llm.openrouterModel', newSettings.openrouterModel);
+  if (newSettings.ollamaBaseUrl) store.set('llm.ollamaBaseUrl', newSettings.ollamaBaseUrl);
+  if (newSettings.ollamaModel) store.set('llm.ollamaModel', newSettings.ollamaModel);
+  if (newSettings.searchEngine) store.set('llm.searchEngine', newSettings.searchEngine);
+  
+  if (newSettings.timeout !== undefined) {
+    const val = parseInt(newSettings.timeout);
+    if (!isNaN(val)) store.set('llm.timeout', val);
+  }
 }
 
 function getCachedModels(provider) {

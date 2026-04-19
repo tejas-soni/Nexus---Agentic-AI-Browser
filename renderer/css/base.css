@@ -413,3 +413,10 @@ input:checked + .slider {
 input:checked + .slider:before {
   transform: translateX(20px);
 }
+
+/* Artifact Shield: Prevent Nexus IDs from appearing visually */
+[data-nexus-id], [data-nexus-id]::before, [data-nexus-id]::after {
+  content: none !important;
+  color: inherit !important;
+  font-size: inherit !important;
+}

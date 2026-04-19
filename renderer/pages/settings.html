@@ -163,6 +163,7 @@
                         <div class="setting-control">
                             <select class="input" id="set-search-engine">
                                 <option value="google">Google</option>
+                                <option value="brave">Brave</option>
                                 <option value="duckduckgo">DuckDuckGo</option>
                                 <option value="bing">Bing</option>
                             </select>
@@ -288,6 +289,7 @@
             document.getElementById('set-openrouterApiKey').value = s.openrouterApiKey || '';
             document.getElementById('set-ollamaBaseUrl').value = s.ollamaBaseUrl || 'http://localhost:11434';
             document.getElementById('set-timeout').value = s.timeout || 300;
+            document.getElementById('set-search-engine').value = s.searchEngine || 'google';
             
             updateProviderGroups();
         }
@@ -312,6 +314,7 @@
                 provider: document.getElementById('set-provider').value,
                 openrouterApiKey: document.getElementById('set-openrouterApiKey').value,
                 ollamaBaseUrl: document.getElementById('set-ollamaBaseUrl').value,
+                searchEngine: document.getElementById('set-search-engine').value,
                 timeout: parseInt(document.getElementById('set-timeout').value) || 300
             };
 

@@ -195,9 +195,6 @@ function createMainWindow() {
   mainWindow.on('maximize', () => mainWindow.webContents.send('window:maximized-change', true));
   mainWindow.on('unmaximize', () => mainWindow.webContents.send('window:maximized-change', false));
 
-  // Open external links with shell
-  ipcMain.handle('shell:open-external', (_, url) => shell.openExternal(url));
-
   mainWindow.on('closed', () => {
     mainWindow = null;
   });

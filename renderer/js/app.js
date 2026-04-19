@@ -36,12 +36,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     let availableModels = [];
-    let processChat;
 
     async function loadAvailableModels(retryCount = 0) {
         const chatModelSelect = document.getElementById('chat-model-select');
         
-        // Initial feedback for the user
         if (chatModelSelect && (chatModelSelect.innerHTML.includes('Loading models...') || chatModelSelect.innerHTML.includes('Fetching brains...'))) {
             chatModelSelect.innerHTML = '<option value="">Connecting to AI Provider...</option>';
         }
@@ -57,7 +55,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     
                     chatModelSelect.innerHTML = availableModels.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
                     
-                    // Restore previously selected model
                     if (targetModel && availableModels.some(m => m.id === targetModel)) {
                         chatModelSelect.value = targetModel;
                     }
@@ -65,7 +62,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 console.warn('[NEXUS:UI] Model fetch failed:', res.error);
                 if (retryCount < 3) {
-                    // Gradual backoff to allow network stability
                     const delay = 2000 * (retryCount + 1);
                     console.log(`[NEXUS:UI] Retrying connection in ${delay}ms... (Attempt ${retryCount + 1})`);
                     setTimeout(() => loadAvailableModels(retryCount + 1), delay);
@@ -97,18 +93,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.nexus.settings.onUpdated(() => {
         console.log('[NEXUS:UI] Settings updated. Refreshing models...');
         loadAvailableModels();
-        if (window.loadAgents) window.loadAgents(); // Refresh personality icons/data
+        if (window.loadAgents) window.loadAgents(); 
     });
 
 
     // ─── OVERKILL STABILITY FIX: Global Agent/Note Handlers ──────
-    // This catches clicks for ALL dynamic elements even after re-renders.
     document.addEventListener('click', async (e) => {
         const target = e.target;
         const btn = target.closest('button');
         if (!btn) return;
 
-        // --- Agents ---
         if (btn.id === 'btn-create-agent') {
             handleCreateAgent();
         } else if (btn.classList.contains('btn-run')) {
@@ -121,9 +115,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             handleEditAgent(btn.getAttribute('data-id'));
         } else if (btn.classList.contains('btn-delete')) {
             handleDeleteAgent(btn.getAttribute('data-id'));
+        } else if (btn.id === 'btn-stop-global') {
+            // Re-enabling legacy global stop
+            window.nexus.agents.stopAll();
+            showToast('Stopping all running agents...', 'warning');
         }
 
-        // --- Notes ---
         if (btn.id === 'btn-new-note') {
             if (typeof window.editNote === 'function') window.editNote(null);
         }
@@ -161,7 +158,48 @@ document.addEventListener('DOMContentLoaded', async () => {
         panelSections: document.querySelectorAll('.panel-section'),
         closeBtns: document.querySelectorAll('.panel-header__close'),
         toastContainer: document.getElementById('toast-container'),
-        btnBookmark: document.getElementById('btn-bookmark')
+        btnBookmark: document.getElementById('btn-bookmark'),
+        // Window Controls
+        btnMinimize: document.getElementById('btn-minimize'),
+        btnMaximize: document.getElementById('btn-maximize'),
+        btnClose: document.getElementById('btn-close')
+    };
+
+    // ─── Window Control Logic ─────────────────────────────────────
+    if (elements.btnMinimize) elements.btnMinimize.onclick = () => window.nexus.window.minimize();
+    if (elements.btnMaximize) elements.btnMaximize.onclick = () => window.nexus.window.maximize();
+    if (elements.btnClose) elements.btnClose.onclick = () => window.nexus.window.close();
+
+    window.nexus.window.onMaximizedChange((isMaximized) => {
+        if (elements.btnMaximize) {
+            elements.btnMaximize.title = isMaximized ? 'Restore' : 'Maximize';
+        }
+    });
+
+    // ─── Browser UI Sync ──────────────────────────────────────────
+    function updateNavUI() {
+        const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+        if (!activeTab || !activeTab.webview) return;
+        
+        try {
+            if (elements.btnBack) elements.btnBack.disabled = !activeTab.webview.canGoBack();
+            if (elements.btnForward) elements.btnForward.disabled = !activeTab.webview.canGoForward();
+        } catch (e) {
+            // Webview might not be ready
+        }
+    }
+
+    if (elements.btnBack) elements.btnBack.onclick = () => {
+        const wv = document.getElementById(`webview-${state.activeTabId}`);
+        if (wv && wv.canGoBack()) wv.goBack();
+    };
+    if (elements.btnForward) elements.btnForward.onclick = () => {
+        const wv = document.getElementById(`webview-${state.activeTabId}`);
+        if (wv && wv.canGoForward()) wv.goForward();
+    };
+    if (elements.btnReload) elements.btnReload.onclick = () => {
+        const wv = document.getElementById(`webview-${state.activeTabId}`);
+        if (wv) wv.reload();
     };
 
     // ─── Nexus Shields Logic ──────────────────────────────────────
@@ -180,20 +218,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function updateShieldsUI() {
         const domain = getActiveDomain();
-        elements.shieldsDomain.innerText = domain;
-        
-        // Load persistency
+        if (elements.shieldsDomain) elements.shieldsDomain.innerText = domain;
         const config = await window.nexus.shields.getConfig(domain);
-        elements.toggleShieldsOn.checked = config.enabled !== false;
-        elements.toggleHttpsUpgrade.checked = config.httpsUpgrade !== false;
-        elements.toggleFingerprinting.checked = config.fingerprinting !== false;
-
-        // Load stats
+        if (elements.toggleShieldsOn) elements.toggleShieldsOn.checked = config.enabled !== false;
+        if (elements.toggleHttpsUpgrade) elements.toggleHttpsUpgrade.checked = config.httpsUpgrade !== false;
+        if (elements.toggleFingerprinting) elements.toggleFingerprinting.checked = config.fingerprinting !== false;
         const stats = await window.nexus.shields.getStats();
-        elements.shieldCount.innerText = stats.blockedCount || 0;
+        if (elements.shieldCount) elements.shieldCount.innerText = stats.blockedCount || 0;
     }
 
     async function toggleShieldsDropdown() {
+        if (!elements.shieldsPopup) return;
         const isHidden = elements.shieldsPopup.classList.contains('hidden');
         if (isHidden) {
             await updateShieldsUI();
@@ -203,14 +238,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    if (elements.btnShields) {
-        elements.btnShields.onclick = (e) => {
-            e.stopPropagation();
-            toggleShieldsDropdown();
-        };
-    }
+    if (elements.btnShields) elements.btnShields.onclick = (e) => { e.stopPropagation(); toggleShieldsDropdown(); };
 
-    // Auto-save changes
     const saveShieldConfig = async () => {
         const domain = getActiveDomain();
         const config = {
@@ -219,29 +248,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             fingerprinting: elements.toggleFingerprinting?.checked
         };
         await window.nexus.shields.saveConfig(domain, config);
-        
-        // Reload current tab to apply blocking/unblocking immediately
         const activeTab = state.tabs.find(t => t.id === state.activeTabId);
-        if (activeTab && activeTab.webview) {
-            activeTab.webview.reload();
-        }
+        if (activeTab && activeTab.webview) activeTab.webview.reload();
     };
 
     if (elements.toggleShieldsOn) elements.toggleShieldsOn.onchange = saveShieldConfig;
     if (elements.toggleHttpsUpgrade) elements.toggleHttpsUpgrade.onchange = saveShieldConfig;
     if (elements.toggleFingerprinting) elements.toggleFingerprinting.onchange = saveShieldConfig;
 
-    // Listen for real-time blocking events
     window.nexus.shields.onStatsUpdate((data) => {
         if (elements.shieldCount) elements.shieldCount.innerText = data.total;
-        // Subtle glow effect on shield icon when blocking occurs
         if (elements.btnShields) {
             elements.btnShields.style.color = 'var(--accent)';
             setTimeout(() => { if (elements.btnShields) elements.btnShields.style.color = ''; }, 500);
         }
     });
 
-    // Close popup on click outside
     document.addEventListener('click', (e) => {
         if (elements.shieldsPopup && !elements.shieldsPopup.contains(e.target) && e.target !== elements.btnShields) {
             elements.shieldsPopup.classList.add('hidden');
@@ -267,6 +289,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
+    window.showToast = showToast;
 
     function showModal(title, fields = []) {
         return new Promise((resolve) => {
@@ -307,8 +330,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
             `;
             overlay.appendChild(modal);
-            const container = document.getElementById('modal-container') || document.body;
-            container.appendChild(overlay);
+            document.body.appendChild(overlay);
 
             const resolveData = (cancelled) => {
                 if (cancelled) resolve(null);
@@ -320,298 +342,228 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                     resolve(data);
                 }
-                overlay.style.animation = 'fade-out 0.2s ease forwards';
-                modal.style.animation = 'modal-out 0.2s ease forwards';
-                setTimeout(() => overlay.remove(), 200);
+                overlay.remove();
             };
 
-            modal.querySelector('#modal-save-btn').addEventListener('click', (e) => { e.stopPropagation(); resolveData(false); });
-            modal.querySelector('#modal-cancel-btn').addEventListener('click', (e) => { e.stopPropagation(); resolveData(true); });
-            modal.querySelector('#modal-cancel-footer-btn').addEventListener('click', (e) => { e.stopPropagation(); resolveData(true); });
-            overlay.addEventListener('click', (e) => { if (e.target === overlay) { e.stopPropagation(); resolveData(true); } });
-            
-            setTimeout(() => { 
-                const first = modal.querySelector('input, textarea'); 
-                if (first) first.focus(); 
-            }, 100);
-            
-            modal.onkeydown = (e) => {
-                if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') { e.preventDefault(); resolveData(false); }
-                else if (e.key === 'Escape') resolveData(true);
-            };
+            modal.querySelector('#modal-save-btn').addEventListener('click', () => resolveData(false));
+            modal.querySelector('#modal-cancel-btn').addEventListener('click', () => resolveData(true));
+            modal.querySelector('#modal-cancel-footer-btn').addEventListener('click', () => resolveData(true));
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) resolveData(true); });
         });
     }
 
     // ─── Sidebar Logic ────────────────────────────────────────────
-    
     function setSidebarExpanded(expanded) {
         state.isSidebarExpanded = expanded;
         if (elements.sidebar) elements.sidebar.classList.toggle('expanded', expanded);
-        window.nexus.settings.save({ sidebarExpanded: expanded });
+        window.nexus.settings.save({ ...state.settings, sidebarExpanded: expanded });
     }
-
-    if (elements.sidebarToggle) {
-        elements.sidebarToggle.onclick = () => setSidebarExpanded(!state.isSidebarExpanded);
-    }
+    if (elements.sidebarToggle) elements.sidebarToggle.onclick = () => setSidebarExpanded(!state.isSidebarExpanded);
 
     // ─── Keyboard Shortcuts ─────────────────────────────────────────
     window.addEventListener('keydown', (e) => {
-        // Toggle Sidebar: Ctrl+B
-        if (e.ctrlKey && (e.key === 'b' || e.key === 'B')) {
-            e.preventDefault();
-            if (elements.sidebarToggle) elements.sidebarToggle.click();
+        // Ctrl + B: Toggle Sidebar
+        if (e.ctrlKey && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); setSidebarExpanded(!state.isSidebarExpanded); }
+        
+        // Ctrl + T: New Tab
+        if (e.ctrlKey && !e.shiftKey && (e.key === 't' || e.key === 'T')) { e.preventDefault(); createTab(); }
+        
+        // Ctrl + Shift + T: Reopen Closed Tab
+        if (e.ctrlKey && e.shiftKey && (e.key === 't' || e.key === 'T')) { 
+            e.preventDefault(); 
+            if (state.closedTabs.length > 0) {
+                const lastUrl = state.closedTabs.pop();
+                createTab(lastUrl);
+                showToast('Tab reopened', 'success');
+            }
         }
         
-        // New Tab: Ctrl+T
-        if (e.ctrlKey && !e.shiftKey && (e.key === 't' || e.key === 'T')) {
-            e.preventDefault();
-            createTab();
-        }
-
-        // Reopen Closed Tab: Ctrl+Shift+T
-        if (e.ctrlKey && e.shiftKey && (e.key === 't' || e.key === 'T')) {
-            e.preventDefault();
-            if (state.closedTabs.length > 0) {
-                const last = state.closedTabs.pop();
-                createTab(last.url);
-                showToast(`Restoring: ${last.title || 'Previous Tab'}`, 'success');
-            } else {
-                showToast('No more closed tabs to restore', 'info');
-            }
-        }
-
-        // Close Tab: Ctrl+W
-        if (e.ctrlKey && (e.key === 'w' || e.key === 'W')) {
-            e.preventDefault();
-            closeTab(state.activeTabId);
-        }
-
-        // Reload: Ctrl+R or F5
-        if ((e.ctrlKey && (e.key === 'r' || e.key === 'R')) || e.key === 'F5') {
-            e.preventDefault();
-            const wv = document.getElementById(`webview-${state.activeTabId}`);
-            if (wv) {
-                wv.reload();
-                showToast('Reloading...', 'info');
-            } else {
-                const tab = state.tabs.find(t => t.id === state.activeTabId);
-                if (tab && (tab.url === 'nexus://newtab' || tab.url === 'nexus://newtab/')) {
-                    showToast('Reloading New Tab...', 'info');
-                }
-            }
-        }
-
-        // History: Ctrl+H
-        if (e.ctrlKey && (e.key === 'h' || e.key === 'H')) {
-            e.preventDefault();
-            closeAllPanels();
-            navigateTo('nexus://history');
-            updateSidebarActive('history');
-        }
-
-        // Bookmarks: Ctrl+Shift+O
-        if (e.ctrlKey && e.shiftKey && (e.key === 'o' || e.key === 'O')) {
-            e.preventDefault();
-            closeAllPanels();
-            navigateTo('nexus://bookmarks');
-            updateSidebarActive('bookmarks');
-        }
-
-        // Focus URL Bar: Ctrl+L or Alt+D
-        if ((e.ctrlKey && (e.key === 'l' || e.key === 'L')) || (e.altKey && (e.key === 'd' || e.key === 'D'))) {
-            e.preventDefault();
-            if (elements.urlInput) {
-                elements.urlInput.focus();
-                elements.urlInput.select();
-            }
-        }
+        // Ctrl + W: Close Tab
+        if (e.ctrlKey && (e.key === 'w' || e.key === 'W')) { e.preventDefault(); closeTab(state.activeTabId); }
+        
+        // Ctrl + R: Reload
+        if (e.ctrlKey && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); const wv = document.getElementById(`webview-${state.activeTabId}`); if (wv) wv.reload(); }
+        
+        // Ctrl + H: History
+        if (e.ctrlKey && (e.key === 'h' || e.key === 'H')) { e.preventDefault(); navigateTo('nexus://history'); }
+        
+        // Ctrl + L: Focus Address Bar
+        if (e.ctrlKey && (e.key === 'l' || e.key === 'L')) { e.preventDefault(); if (elements.urlInput) elements.urlInput.focus(); elements.urlInput.select(); }
     });
 
     elements.navItems.forEach(item => {
         item.onclick = () => {
             const panel = item.getAttribute('data-panel');
-            if (panel === 'home' || !panel) {
-                closeAllPanels();
-                showNewTabPage();
-            } else if (['settings', 'bookmarks', 'history', 'downloads'].includes(panel)) {
-                closeAllPanels();
-                navigateTo(`nexus://${panel}`);
-            } else {
-                openPanel(panel);
-            }
+            if (panel === 'home' || !panel) { closeAllPanels(); navigateTo('nexus://newtab'); } 
+            else if (['settings', 'bookmarks', 'history'].includes(panel)) { closeAllPanels(); navigateTo(`nexus://${panel}`); }
+            else openPanel(panel);
             elements.navItems.forEach(i => i.classList.remove('active'));
             item.classList.add('active');
         };
     });
 
-    // ─── Panel Logic ──────────────────────────────────────────────
-    
     function openPanel(panelId) {
         elements.panelSections.forEach(sec => sec.classList.remove('active'));
         const target = document.getElementById(`panel-${panelId}`);
-        if (target) {
-            target.classList.add('active');
-            elements.rightPanel.classList.add('open');
-            state.activePanel = panelId;
+        if (target) { target.classList.add('active'); elements.rightPanel.classList.add('open'); state.activePanel = panelId; }
+    }
+    function closeAllPanels() { if (elements.rightPanel) elements.rightPanel.classList.remove('open'); state.activePanel = 'home'; }
+    elements.closeBtns.forEach(btn => btn.onclick = closeAllPanels);
+    if (elements.btnAiToggle) elements.btnAiToggle.onclick = () => { if (elements.rightPanel.classList.contains('open') && state.activePanel === 'chat') closeAllPanels(); else openPanel('chat'); };
+
+    // ─── Direct Snapshot Helper (Prevents Deadlocks) ───────────────
+    async function getDistilledSnapshot() {
+        const wv = document.getElementById(`webview-${state.activeTabId}`);
+        if (!wv) return { success: true, snapshot: { title: 'New Tab', url: 'nexus://newtab', summary: 'On home screen.' } };
+        
+        try {
+            const script = await fetch('js/domDistiller.js').then(r => r.text());
+            const result = await wv.executeJavaScript(script);
+            return { success: true, snapshot: result };
+        } catch (err) {
+            console.error('[NEXUS:CTX] Local distillation failed', err);
+            return { success: false, error: err.message };
         }
     }
 
-    function closeAllPanels() {
-        if (elements.rightPanel) elements.rightPanel.classList.remove('open');
-        state.activePanel = 'home';
-    }
-
-    elements.closeBtns.forEach(btn => { btn.onclick = closeAllPanels; });
-
-    if (elements.btnAiToggle) {
-        elements.btnAiToggle.onclick = () => {
-            if (elements.rightPanel.classList.contains('open') && state.activePanel === 'chat') {
-                closeAllPanels();
-            } else {
-                openPanel('chat');
-            }
-        };
-    }
-
     // ─── Tab Logic ────────────────────────────────────────────────
-    
     function createTab(url = null) {
         const id = Date.now().toString();
         const targetUrl = url || 'nexus://newtab';
-        const tab = { id, url: targetUrl, title: 'New Tab', loading: false, favicon: null };
+        const tab = { id, url: targetUrl, title: 'New Tab', loading: false, favicon: null, webview: null };
         state.tabs.push(tab);
         renderTabs();
-        
         const webview = document.createElement('webview');
-        webview.id = `webview-${id}`;
-        webview.setAttribute('allowpopups', '');
+        webview.id = `webview-${id}`; webview.src = targetUrl;
+        tab.webview = webview;
+        webview.setAttribute('allowpopups', ''); 
         webview.setAttribute('allowfullscreen', '');
-        
-        webview.src = targetUrl;
-        
         elements.webviewContainer.appendChild(webview);
         setupWebviewEvents(webview, id);
-        
         switchTab(id);
-        return id;
     }
 
     function setupWebviewEvents(webview, tabId) {
-        webview.addEventListener('did-start-loading', async () => {
-            const tab = state.tabs.find(t => t.id === tabId);
-            if (tab) { tab.loading = true; renderTabs(); }
-            
-            // Inject Anti-Fingerprinting script if enabled for this domain
-            try {
-                const url = new URL(webview.getURL());
-                const config = await window.nexus.shields.getConfig(url.hostname);
-                if (config.fingerprinting !== false) {
-                    const script = await fetch('../preload/shields.js').then(r => r.text());
-                    webview.executeJavaScript(script);
-                }
-            } catch (e) {}
+        // Find reference
+        const getTab = () => state.tabs.find(t => t.id === tabId);
+
+        webview.addEventListener('did-start-loading', () => { 
+            const tab = getTab(); 
+            if (tab) { 
+                tab.loading = true; 
+                renderTabs(); 
+                if (state.activeTabId === tabId) updateNavUI();
+            } 
         });
+
         webview.addEventListener('did-stop-loading', () => {
-            const tab = state.tabs.find(t => t.id === tabId);
+            const tab = getTab();
             if (tab) {
-                tab.loading = false;
-                tab.title = webview.getTitle();
+                tab.loading = false; 
+                tab.title = webview.getTitle(); 
                 tab.url = webview.getURL();
                 renderTabs();
                 if (state.activeTabId === tabId) {
-                    if (elements.urlInput) {
-                        elements.urlInput.value = (tab.url === 'nexus://newtab' || tab.url === 'nexus://newtab/') ? '' : tab.url;
-                    }
-                    updateNavButtons(webview);
+                    elements.urlInput.value = (tab.url.startsWith('nexus://')) ? '' : tab.url;
+                    updateBookmarkStatus(tab.url);
+                    updateNavUI();
                 }
-                
-                // History hardening: ensure we use the definitive values from the webview
-                const finalTitle = webview.getTitle();
-                const finalUrl = webview.getURL();
-                window.nexus.history.add({ title: finalTitle, url: finalUrl, favicon: tab.favicon });
+                window.nexus.history.add({ title: tab.title, url: tab.url, favicon: tab.favicon });
+            }
+        });
 
-                // Update bookmark status on navigation
-                if (state.activeTabId === tabId) {
-                    updateBookmarkStatus(finalUrl);
+        webview.addEventListener('did-start-navigation', (e) => {
+            if (e.isMainFrame) {
+                const tab = getTab();
+                if (tab) {
+                    tab.url = e.url;
+                    if (state.activeTabId === tabId) {
+                        elements.urlInput.value = tab.url.startsWith('nexus://') ? '' : tab.url;
+                        updateNavUI();
+                    }
                 }
             }
         });
+
+        webview.addEventListener('load-commit', (e) => {
+            if (e.isMainFrame) {
+                const tab = getTab();
+                if (tab) {
+                    tab.url = e.url;
+                    if (state.activeTabId === tabId) {
+                        elements.urlInput.value = tab.url.startsWith('nexus://') ? '' : tab.url;
+                    }
+                }
+            }
+        });
+
         webview.addEventListener('page-title-updated', (e) => {
-            const tab = state.tabs.find(t => t.id === tabId);
+            const tab = getTab();
             if (tab) { tab.title = e.title; renderTabs(); }
         });
-        webview.addEventListener('page-favicon-updated', (e) => {
-            const tab = state.tabs.find(t => t.id === tabId);
-            if (tab) { tab.favicon = e.favicons[0]; renderTabs(); }
+
+        webview.addEventListener('page-favicon-updated', (e) => { 
+            const tab = getTab(); 
+            if (tab) { tab.favicon = e.favicons[0]; renderTabs(); } 
         });
 
-        webview.addEventListener('enter-html-full-screen', () => {
-            document.body.classList.add('is-fullscreen');
-        });
-        webview.addEventListener('leave-html-full-screen', () => {
-            document.body.classList.remove('is-fullscreen');
+        webview.addEventListener('new-window', (e) => { e.preventDefault(); createTab(e.url); });
+
+        webview.addEventListener('did-navigate', () => {
+            if (state.activeTabId === tabId) updateNavUI();
         });
 
-        webview.addEventListener('new-window', (e) => {
-            e.preventDefault();
-            createTab(e.url);
+        webview.addEventListener('did-navigate-in-page', () => {
+            if (state.activeTabId === tabId) updateNavUI();
         });
-        webview.addEventListener('context-menu', (e) => {
-            e.preventDefault();
-            window.nexus.tabs.sendContextMenu({
-                x: e.params.x,
-                y: e.params.y,
-                linkURL: e.params.linkURL,
-                srcURL: e.params.srcURL,
-                mediaType: e.params.mediaType,
-                pageURL: e.params.pageURL,
-                selectionText: e.params.selectionText
-            });
-        });
+
+        /**
+         * Internal IPC Tunnel Handler (Relocated)
+         * Intercepts nexus:// page requests via console.log
+         */
         webview.addEventListener('console-message', async (e) => {
-            if (e.message.startsWith('NEXUS_IPC:')) {
-                try {
-                    const req = JSON.parse(e.message.replace('NEXUS_IPC:', ''));
-                    let res;
-                    if (req.action === 'settings.get') res = await window.nexus.settings.get();
-                    else if (req.action === 'settings.save') res = await window.nexus.settings.save(req.data);
-                    else if (req.action === 'settings.testConnection') res = await window.nexus.settings.testConnection();
-                    
-                    else if (req.action === 'history.get') res = await window.nexus.history.get(req.data);
-                    else if (req.action === 'history.add') res = await window.nexus.history.add(req.data);
-                    else if (req.action === 'history.remove') res = await window.nexus.history.remove(req.data);
-                    else if (req.action === 'history.clear') res = await window.nexus.history.clear();
-                    
-                    else if (req.action === 'bookmarks.get') res = await window.nexus.bookmarks.get(req.data);
-                    else if (req.action === 'bookmarks.add') res = await window.nexus.bookmarks.add(req.data);
-                    else if (req.action === 'bookmarks.remove') res = await window.nexus.bookmarks.remove(req.data);
-                    else if (req.action === 'bookmarks.clear') res = await window.nexus.bookmarks.clear();
-                    else if (req.action === 'bookmarks.import') res = await window.nexus.bookmarks.import();
-                    else if (req.action === 'bookmarks.export') res = await window.nexus.bookmarks.export();
-                    
-                    const safeRes = btoa(unescape(encodeURIComponent(JSON.stringify(res || {}))));
-                    webview.executeJavaScript(`if(window._ipcCallbacks && window._ipcCallbacks["${req.reqId}"]) { window._ipcCallbacks["${req.reqId}"](JSON.parse(decodeURIComponent(escape(atob("${safeRes}"))))); delete window._ipcCallbacks["${req.reqId}"]; }`).catch(console.error);
-                } catch (err) {
-                    console.error('[NEXUS:IPC-Tunnel] Error:', err);
+            const msg = e.message;
+            if (!msg || !msg.startsWith('NEXUS_IPC:')) return;
+
+            try {
+                const { action, data, reqId } = JSON.parse(msg.replace('NEXUS_IPC:', ''));
+                console.log(`[NEXUS:IPC] Webview[${tabId}] -> ${action}`, data);
+
+                let result;
+                const parts = action.split('.');
+                const service = parts[0];
+                const method = parts[1];
+
+                if (window.nexus[service] && window.nexus[service][method]) {
+                    result = await window.nexus[service][method](data);
+                } else {
+                    throw new Error(`Service method not found: ${action}`);
                 }
+
+                const responseScript = `
+                    if (window._ipcCallbacks && window._ipcCallbacks["${reqId}"]) {
+                        window._ipcCallbacks["${reqId}"](${JSON.stringify(result)});
+                        delete window._ipcCallbacks["${reqId}"];
+                    }
+                `;
+                webview.executeJavaScript(responseScript);
+            } catch (err) {
+                console.error('[NEXUS:IPC] Tunnel failure:', err);
             }
         });
     }
 
     function switchTab(id) {
         state.activeTabId = id;
-        const tab = state.tabs.find(t => t.id === id);
         renderTabs();
         document.querySelectorAll('webview').forEach(wv => wv.style.display = 'none');
-        
         const webview = document.getElementById(`webview-${id}`);
         if (webview) {
             webview.style.display = 'flex';
-            if (elements.urlInput) {
-                elements.urlInput.value = (tab.url === 'nexus://newtab' || tab.url === 'nexus://newtab/') ? '' : tab.url;
-            }
-            updateNavButtons(webview);
+            const tab = state.tabs.find(t => t.id === id);
+            elements.urlInput.value = (tab.url.startsWith('nexus://')) ? '' : tab.url;
             updateBookmarkStatus(webview.getURL());
+            updateNavUI();
         }
     }
 
@@ -619,21 +571,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (e) e.stopPropagation();
         const index = state.tabs.findIndex(t => t.id === id);
         if (index === -1) return;
-
+        
+        // Store for Ctrl+Shift+T
         const closedTab = state.tabs[index];
-        if (closedTab && closedTab.url !== 'nexus://newtab') {
-            state.closedTabs.push({ 
-                url: closedTab.url, 
-                title: closedTab.title, 
-                favicon: closedTab.favicon 
-            });
-            // Keep only the last 15 closed tabs
-            if (state.closedTabs.length > 15) state.closedTabs.shift();
+        if (closedTab && closedTab.url && !closedTab.url.startsWith('nexus://')) {
+            state.closedTabs.push(closedTab.url);
+            if (state.closedTabs.length > 50) state.closedTabs.shift();
         }
 
         state.tabs.splice(index, 1);
-        const webview = document.getElementById(`webview-${id}`);
-        if (webview) webview.remove();
+        document.getElementById(`webview-${id}`)?.remove();
         if (state.tabs.length === 0) createTab();
         else if (state.activeTabId === id) switchTab(state.tabs[Math.max(0, index - 1)].id);
         else renderTabs();
@@ -646,270 +593,252 @@ document.addEventListener('DOMContentLoaded', async () => {
             const tabEl = document.createElement('div');
             tabEl.className = `tab ${state.activeTabId === tab.id ? 'active' : ''}`;
             tabEl.onclick = () => switchTab(tab.id);
-            const favicon = tab.favicon ? `<img src="${tab.favicon}">` : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
+            
+            const loadingHtml = tab.loading ? '<div class="tab__spinner"></div>' : '';
+            const faviconHtml = tab.favicon ? `<img src="${tab.favicon}" class="tab__favicon">` : '<div class="tab__icon-default"></div>';
+            
             tabEl.innerHTML = `
-                <div class="tab__favicon">${tab.loading ? '<div class="spinner spinner--sm"></div>' : favicon}</div>
+                ${loadingHtml || faviconHtml}
                 <div class="tab__title">${tab.title || 'New Tab'}</div>
-                <button class="tab__close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+                <button class="tab__close">&times;</button>
             `;
             tabEl.querySelector('.tab__close').onclick = (e) => closeTab(tab.id, e);
             elements.tabList.appendChild(tabEl);
         });
     }
 
-    function showNewTabPage() {
-        navigateTo('nexus://newtab');
-    }
-
-    // ─── Navigation Logic ─────────────────────────────────────────
-
-    function updateNavButtons(webview) {
-        if (elements.btnBack) elements.btnBack.disabled = !webview.canGoBack();
-        if (elements.btnForward) elements.btnForward.disabled = !webview.canGoForward();
-    }
-
     function navigateTo(url) {
-        let tab = state.tabs.find(t => t.id === state.activeTabId);
-        tab.url = url;
-        let webview = document.getElementById(`webview-${tab.id}`);
-        if (!webview) {
-            webview = document.createElement('webview');
-            webview.id = `webview-${tab.id}`;
-            webview.setAttribute('allowpopups', '');
-            webview.setAttribute('allowfullscreen', '');
-            elements.webviewContainer.appendChild(webview);
-            setupWebviewEvents(webview, tab.id);
-        }
-        webview.src = url;
-        switchTab(tab.id);
+        const tab = state.tabs.find(t => t.id === state.activeTabId);
+        const webview = document.getElementById(`webview-${tab.id}`);
+        if (webview) webview.src = url;
     }
 
     async function updateBookmarkStatus(url) {
-        if (!elements.btnBookmark || !url) return;
-        if (url.startsWith('nexus://') || url.startsWith('about:')) {
-            elements.btnBookmark.classList.remove('active');
-            return;
-        }
-
+        if (!elements.btnBookmark) return;
         const bookmarks = await window.nexus.bookmarks.get();
         const isBookmarked = bookmarks.some(b => b.url === url);
-        
-        if (isBookmarked) {
-            elements.btnBookmark.classList.add('active');
-            elements.btnBookmark.title = 'Remove bookmark';
-        } else {
-            elements.btnBookmark.classList.remove('active');
-            elements.btnBookmark.title = 'Bookmark this page';
+        elements.btnBookmark.classList.toggle('active', isBookmarked);
+    }
+    if (elements.btnBookmark) elements.btnBookmark.onclick = async () => {
+        const tab = state.tabs.find(t => t.id === state.activeTabId);
+        const webview = document.getElementById(`webview-${tab.id}`);
+        if (webview) {
+            const url = webview.getURL();
+            const bookmarks = await window.nexus.bookmarks.get();
+            const existing = bookmarks.find(b => b.url === url);
+            if (existing) await window.nexus.bookmarks.remove(existing.id);
+            else await window.nexus.bookmarks.add({ title: webview.getTitle(), url, favicon: tab.favicon });
+            updateBookmarkStatus(url);
         }
-    }
+    };
 
-    if (elements.btnBookmark) {
-        elements.btnBookmark.onclick = async () => {
-            const tab = state.tabs.find(t => t.id === state.activeTabId);
-            const webview = document.getElementById(`webview-${tab.id}`);
-            if (tab && webview) {
-                const title = webview.getTitle() || tab.title || 'Untitled';
-                const url = webview.getURL() || tab.url;
-                
-                if (url.startsWith('nexus://') || url.startsWith('about:')) {
-                    showToast('Cannot bookmark internal pages', 'warning');
-                    return;
-                }
-
-                const bookmarks = await window.nexus.bookmarks.get();
-                const existing = bookmarks.find(b => b.url === url);
-
-                if (existing) {
-                    await window.nexus.bookmarks.remove(existing.id);
-                    showToast('Bookmark removed', 'info');
-                } else {
-                    await window.nexus.bookmarks.add({ title, url, favicon: tab.favicon });
-                    showToast('Page bookmarked!', 'success');
-                }
-                updateBookmarkStatus(url);
+    if (elements.urlInput) elements.urlInput.onkeydown = async (e) => {
+        if (e.key === 'Enter') {
+            let val = elements.urlInput.value.trim();
+            if (!val) return;
+            if (!val.includes('://') && !val.startsWith('nexus://')) {
+                const settings = await window.nexus.settings.get();
+                const engine = settings.searchEngine || 'google';
+                const engines = {
+                    google: 'https://www.google.com/search?q=',
+                    brave: 'https://search.brave.com/search?q=',
+                    duckduckgo: 'https://duckduckgo.com/?q=',
+                    bing: 'https://www.bing.com/search?q='
+                };
+                const baseUrl = engines[engine] || engines.google;
+                val = baseUrl + encodeURIComponent(val);
             }
-        };
-    }
-
-    elements.btnBack.onclick = () => { const wv = document.getElementById(`webview-${state.activeTabId}`); if (wv) wv.goBack(); };
-    elements.btnForward.onclick = () => { const wv = document.getElementById(`webview-${state.activeTabId}`); if (wv) wv.goForward(); };
-    elements.btnReload.onclick = () => { const tab = state.tabs.find(t => t.id === state.activeTabId); if (tab.url !== 'nexus://newtab') { const wv = document.getElementById(`webview-${state.activeTabId}`); if (wv) wv.reload(); } };
-
-    if (elements.urlInput) {
-        elements.urlInput.onkeydown = (e) => {
-            if (e.key === 'Enter') {
-                let val = elements.urlInput.value.trim();
-                if (!val) return;
-                if (!val.includes('://') && !val.startsWith('nexus://') && !val.startsWith('about:')) {
-                    if (val.includes('.') && !val.includes(' ')) val = 'https://' + val;
-                    else val = 'https://www.google.com/search?q=' + encodeURIComponent(val);
-                }
-                if (val.startsWith('about:')) val = 'nexus://' + val.substr(6);
-                navigateTo(val);
-            }
-        };
-    }
+            navigateTo(val);
+        }
+    };
 
     if (elements.btnNewTab) elements.btnNewTab.onclick = () => createTab();
-    window.nexus.tabs.onOpenUrl?.((url) => navigateTo(url));
-    window.nexus.tabs.onOpenNewTab?.((url) => createTab(url));
 
-    // ─── Browser Automation Bridge ────────────────────────────────
-    
-    window.nexus.tabs.onSnapshotRequest?.((_) => {
+    // ─── Bridge Events ──────────────────────────────────────────
+    window.nexus.tabs.onOpenUrl?.((url) => {
+        navigateTo(url);
+        showToast(`Agent is navigating...`, 'info');
+    });
+
+    window.nexus.tabs.onOpenNewTab?.((url) => {
+        createTab(url);
+        showToast('Agent opened a new tab.', 'info');
+    });
+
+    window.nexus.tabs.onMenuAction?.((data) => {
         const webview = document.getElementById(`webview-${state.activeTabId}`);
-        if (!webview) {
-            window.nexus.tabs.sendSnapshotResult({ success: true, snapshot: { title: 'New Tab', url: 'nexus://newtab', elements: [], summary: 'On new tab page.' } });
-            return;
-        }
-        fetch('js/domDistiller.js').then(res => res.text()).then(script => {
-            webview.executeJavaScript(script).then(result => {
-                // Ensure painting completes before capture
-                setTimeout(async () => {
-                    try {
-                        const image = await webview.capturePage();
-                        result.image = image.toDataURL(); // data:image/png;base64,...
-                        window.nexus.tabs.sendSnapshotResult({ success: true, snapshot: result });
-                    } catch (err) {
-                        console.error('Snapshot visual capture failed', err);
-                        window.nexus.tabs.sendSnapshotResult({ success: true, snapshot: result });
-                    }
-                }, 150); // slight delay to allow overlay boxes to render visually
-            }).catch(err => {
-                window.nexus.tabs.sendSnapshotResult({ success: false, error: err.message });
-            });
-        });
+        if (!webview) return;
+        if (data === 'back') { if(webview.canGoBack()) webview.goBack(); }
+        else if (data === 'forward') { if(webview.canGoForward()) webview.goForward(); }
+        else if (data === 'reload') webview.reload();
+        else if (data.action === 'inspect') webview.inspectElement(data.x, data.y);
+    });
+
+    window.nexus.tabs.onCloseTabsCommand?.((_, direction) => {
+        const activeId = state.activeTabId;
+        const index = state.tabs.findIndex(t => t.id === activeId);
+        if (index === -1) return;
+
+        let toClose = [];
+        if (direction === 'left') toClose = state.tabs.slice(0, index);
+        else if (direction === 'right') toClose = state.tabs.slice(index + 1);
+        else if (direction === 'other') toClose = state.tabs.filter(t => t.id !== activeId);
+
+        toClose.forEach(t => closeTab(t.id));
+        showToast(`Agent closed ${toClose.length} tabs.`, 'info');
+    });
+
+    window.nexus.tabs.onBookmarkCommand?.(() => {
+        const btn = document.getElementById('btn-bookmark');
+        if (btn) btn.click();
+    });
+
+    window.nexus.tabs.onSnapshotRequest?.(async () => {
+        const res = await getDistilledSnapshot();
+        window.nexus.tabs.sendSnapshotResult(res);
     });
 
     window.nexus.tabs.onInteractRequest?.((_, { action, data }) => {
         const webview = document.getElementById(`webview-${state.activeTabId}`);
         if (!webview) return;
-        let script = '';
-        if (action === 'click') { script = `window.nexusInteract.click("${data.id}")`; showToast(`Nexus is clicking ${data.id}...`, 'info'); }
-        else if (action === 'type') { script = `window.nexusInteract.type("${data.id}", "${data.text}")`; showToast(`Nexus is typing...`, 'info'); }
-        else if (action === 'scroll') { script = `window.nexusInteract.scroll("${data.direction}")`; }
-        webview.executeJavaScript(script).then(result => { window.nexus.tabs.sendInteractResult({ success: result }); }).catch(err => { window.nexus.tabs.sendInteractResult({ success: false, error: err.message }); });
+        let script = action === 'click' ? `window.nexusInteract.click("${data.id}")` : `window.nexusInteract.type("${data.id}", "${data.text}")`;
+        webview.executeJavaScript(script).then(r => window.nexus.tabs.sendInteractResult({ success: r }));
     });
 
-    if (elements.newTabSearch) {
-        elements.newTabSearch.onkeydown = (e) => { 
-            if (e.key === 'Enter') navigateTo('https://www.google.com/search?q=' + encodeURIComponent(elements.newTabSearch.value)); 
+    // ─── AI CHAT (IRONCLAD) ───────────────────────────────────────
+    function initImageGen() {
+        const promptInput = document.getElementById('imagegen-prompt');
+        const sendBtn = document.getElementById('imagegen-send');
+        const gallery = document.getElementById('imagegen-gallery');
+        
+        if (!promptInput || !sendBtn || !gallery) return;
+
+        sendBtn.onclick = () => {
+            const val = promptInput.value.trim();
+            if (!val) return;
+            
+            promptInput.value = '';
+            
+            // Remove empty state if present
+            const emptyState = gallery.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+
+            // Create generation placeholder
+            const card = document.createElement('div');
+            card.style.position = 'relative';
+            card.style.borderRadius = '12px';
+            card.style.overflow = 'hidden';
+            card.style.marginBottom = '16px';
+            card.style.backgroundColor = 'var(--bg-elevated)';
+            card.style.minHeight = '200px';
+            card.style.display = 'flex';
+            card.style.flexDirection = 'column';
+            card.style.alignItems = 'center';
+            card.style.justifyContent = 'center';
+            card.style.border = '1px solid var(--border)';
+            
+            const loader = document.createElement('div');
+            loader.innerText = 'Generating image... ✨';
+            loader.style.color = 'var(--text-muted)';
+            loader.style.fontSize = '12px';
+            loader.style.fontWeight = '500';
+            card.appendChild(loader);
+            
+            // Prepend new card to gallery
+            gallery.prepend(card);
+
+            // Fetch natively via img tag connected to pollinations AI
+            const seed = Math.floor(Math.random() * 1000000);
+            const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(val)}?nologo=true&seed=${seed}`;
+            
+            const img = new Image();
+            img.style.width = '100%';
+            img.style.height = 'auto';
+            img.style.display = 'block';
+            img.style.opacity = '0';
+            img.style.transition = 'opacity 0.3s ease';
+
+            img.onload = () => {
+                loader.remove();
+                card.style.minHeight = 'auto'; 
+                card.appendChild(img);
+                img.style.opacity = '1';
+                
+                const downloadBtn = document.createElement('button');
+                downloadBtn.className = 'btn btn-primary';
+                downloadBtn.style.position = 'absolute';
+                downloadBtn.style.bottom = '12px';
+                downloadBtn.style.right = '12px';
+                downloadBtn.style.padding = '8px 16px';
+                downloadBtn.style.fontSize = '12px';
+                downloadBtn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
+                downloadBtn.style.zIndex = '10';
+                downloadBtn.innerText = 'Download';
+                
+                downloadBtn.onclick = async (e) => {
+                    e.stopPropagation();
+                    const originalText = downloadBtn.innerText;
+                    downloadBtn.innerText = 'Saving...';
+                    try {
+                        const res = await fetch(imgUrl);
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `nexus_art_${seed}.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        showToast('Image downloaded!', 'success');
+                    } catch(e) {
+                        console.error('Download failed', e);
+                        showToast('Download failed', 'error');
+                    }
+                    downloadBtn.innerText = originalText;
+                };
+
+                card.appendChild(downloadBtn);
+            };
+
+            img.onerror = () => {
+                loader.innerText = 'Failed to generate image. Please try again.';
+                loader.style.color = 'var(--danger)';
+            };
+
+            img.src = imgUrl; 
+        };
+        
+        promptInput.onkeydown = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendBtn.click();
+            }
         };
     }
-    document.querySelectorAll('.newtab__shortcut').forEach(sc => { 
-        sc.onclick = () => navigateTo(sc.getAttribute('data-url')); 
-    });
-
-    // ─── Window Controls ──────────────────────────────────────────
-    
-    // ─── Window Controls (Safe Mode) ──────────────────────────
-    const safeAssignClick = (id, fn) => {
-        const el = document.getElementById(id);
-        if (el) el.onclick = fn;
-        else console.warn(`[NEXUS:STABILITY] Optional UI element not found: ${id}`);
-    };
-
-    safeAssignClick('btn-minimize', () => window.nexus.window.minimize());
-    safeAssignClick('btn-maximize', () => window.nexus.window.maximize());
-    safeAssignClick('btn-close', () => window.nexus.window.close());
-
-    // ─── Native AI Browser Commands ───────────────────────────────
-    
-    window.nexus.tabs.onCloseTabsCommand?.((_, direction) => {
-        const activeIdx = state.tabs.findIndex(t => t.id === state.activeTabId);
-        if (activeIdx === -1) return;
-        
-        let toClose = [];
-        if (direction === 'right') toClose = state.tabs.slice(activeIdx + 1);
-        else if (direction === 'left') toClose = state.tabs.slice(0, activeIdx);
-        else if (direction === 'other') toClose = state.tabs.filter(t => t.id !== state.activeTabId);
-        
-        toClose.forEach(t => closeTab(t.id));
-        showToast(`AI closed tabs to the ${direction}`, 'info');
-    });
-
-    window.nexus.tabs.onBookmarkCommand?.(() => {
-        const tab = state.tabs.find(t => t.id === state.activeTabId);
-        if (tab && tab.url !== 'nexus://newtab') {
-            window.nexus.bookmarks.add({ title: tab.title, url: tab.url });
-            showToast('AI bookmarked this page', 'success');
-        }
-    });
-
-    window.nexus.settings.onSetThemeCommand?.((_, mode) => {
-        document.body.setAttribute('data-theme', mode); // Simple toggle
-        showToast(`AI set theme to ${mode}`, 'info');
-    });
-
-    // ─── Initialization ───────────────────────────────────────────
-    
-    try {
-        createTab();
-    } catch (err) {
-        console.error('[NEXUS:STABILITY] Initial createTab failed, suppressing to allow AI modules:', err);
-    }
-
-    const initModule = (name, initFn) => {
-        console.log('[NEXUS] Initializing module:', name);
-        try {
-            initFn();
-        } catch (e) {
-            console.error(`[NEXUS] Failed to init ${name}:`, e);
-        }
-    }
-
-
-    // ─── Priority System Check (Always start AI first) ────────────
-    initModule('Chat', initChat);
-    initModule('Agents', initAgents);
-    initModule('Notes', initNotes);
-    // Settings and Bookmarks are now handled by the modular Platform Services and about: pages.
-
-    // Initial Data Fetch
-    setTimeout(() => {
-        if (window.loadNexusModels) window.loadNexusModels();
-        if (window.loadAgents) window.loadAgents();
-    }, 500);
-
-    console.log('[NEXUS] Systems Check: Nominal. Multi-Model Engine Active.');
-
-    // ─── Module Definitions (Hoisted) ─────────────────────────────
 
     function initChat() {
         const input = document.getElementById('chat-input');
         const send = document.getElementById('chat-send');
         const stopBtn = document.getElementById('chat-stop');
         const messagesEl = document.getElementById('chat-messages');
-        const contextBtn = document.getElementById('chat-context-btn');
+        const clearBtn = document.getElementById('chat-context-btn');
         
         let sessionMessages = [];
         let activeChatId = null;
         let currentBubble = null;
         let currentStreamText = '';
-        let contextEnabled = false;
-
-        if (contextBtn) {
-            contextBtn.onclick = () => {
-                contextEnabled = !contextEnabled;
-                contextBtn.classList.toggle('active', contextEnabled);
-                contextBtn.style.color = contextEnabled ? 'var(--accent)' : 'var(--text-muted)';
-                contextBtn.style.background = contextEnabled ? 'var(--accent-subtle)' : 'transparent';
-                showToast(`AI Context Reading: ${contextEnabled ? 'ON' : 'OFF'}`, 'info');
-            };
-        }
 
         function addMessage(role, content) {
-            if (!messagesEl) return null;
+            if (!messagesEl) return;
             const msg = document.createElement('div');
             msg.className = `chat__message chat__message--${role}`;
-            const avatar = role === 'ai' ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>' : '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
-            msg.innerHTML = `<div class="chat__avatar chat__avatar--${role}">${avatar}</div><div class="chat__bubble">${content}</div>`;
+            msg.innerHTML = `<div class="chat__bubble">${content}</div>`;
             messagesEl.appendChild(msg);
             messagesEl.scrollTop = messagesEl.scrollHeight;
             return msg;
         }
 
-        // --- Persistent Persistent Listeners ---
         window.nexus.llm.onChunk(({ chatId, chunk }) => {
             if (chatId !== activeChatId) return;
             currentStreamText += chunk;
@@ -917,193 +846,61 @@ document.addEventListener('DOMContentLoaded', async () => {
             messagesEl.scrollTop = messagesEl.scrollHeight;
         });
 
-        const cleanup = (chatId) => {
-            if (chatId !== activeChatId) return;
-            if (stopBtn) stopBtn.classList.add('hidden');
-            if (send) send.classList.remove('hidden');
-        };
-
         window.nexus.llm.onDone(({ chatId }) => {
             if (chatId !== activeChatId) return;
             sessionMessages.push({ role: 'assistant', content: currentStreamText });
-            cleanup(chatId);
+            if (stopBtn) stopBtn.classList.add('hidden');
+            if (send) send.classList.remove('hidden');
         });
 
         window.nexus.llm.onError(({ chatId, error }) => {
             if (chatId !== activeChatId) return;
             if (currentBubble) currentBubble.innerText = `Error: ${error}`;
-            cleanup(chatId);
+            if (stopBtn) stopBtn.classList.add('hidden');
+            if (send) send.classList.remove('hidden');
         });
 
-        processChat = async function() {
-            try {
-                const text = input.value?.trim();
-                if (!text) return;
-                
-                input.value = '';
-                
-                // Clean up old state
-                currentStreamText = '';
-                activeChatId = 'chat-' + Date.now();
-                console.log(`TRACE: Initializing session: ${activeChatId}`);
-                
-                addMessage('user', text);
-                const aiMsg = addMessage('ai', 'Thinking...');
-                if (!aiMsg) throw new Error('UI failed to render message bubble');
-                
-                currentBubble = aiMsg.querySelector('.chat__bubble');
+        async function processChat() {
+            const text = input.value.trim();
+            if (!text) return;
+            input.value = '';
+            currentStreamText = '';
+            activeChatId = 'chat-' + Date.now();
+            
+            addMessage('user', text);
+            const aiMsg = addMessage('ai', 'Thinking...');
+            currentBubble = aiMsg.querySelector('.chat__bubble');
+            
+            if (stopBtn) stopBtn.classList.remove('hidden');
+            if (send) send.classList.add('hidden');
 
-                if (stopBtn) stopBtn.classList.remove('hidden');
-                if (send) send.classList.add('hidden');
-
-                if (contextEnabled) {
-                    console.log('TRACE: Context enabled. Fetching snapshot...');
-                    const snap = await window.nexus.tabs.getSnapshot();
-                    if (snap && snap.success && snap.snapshot) {
-                        sessionMessages.push({ role: 'system', content: `CRITICAL CONTEXT: You are looking at the page "${snap.snapshot.title}". URL: ${snap.snapshot.url}. Here is the distilled summary of the page: ${snap.snapshot.summary}` });
-                        showToast('AI read page context...', 'info');
-                    }
-                }
-                sessionMessages.push({ role: 'user', content: text });
-
-                const modelSelect = document.getElementById('chat-model-select');
-                let model = modelSelect?.value;
-                console.log(`TRACE: Selected model from UI: ${model || 'DEFAULT'}`);
-                
-                // Final safety: if model is empty string (Loading/Offline), fallback to settings
-                if (!model) {
-                    console.log('TRACE: Model is empty, fetching native settings fallback...');
-                    const currentSettings = await window.nexus.settings.get();
-                    const provider = currentSettings.provider || 'openrouter';
-                    model = provider === 'openrouter' ? currentSettings.openrouterModel : (provider === 'ollama' ? currentSettings.ollamaModel : currentSettings.pollinationsModel);
-                    console.log(`TRACE: Fallback model resolved: ${model}`);
-                }
-
-                const currentSettings = await window.nexus.settings.get();
-                const ignitionDelay = currentSettings.timeout || 300;
-
-                setTimeout(() => {
-                    console.log(`TRACE: Dispatching stream request to IPC bridge for ${activeChatId}...`);
-                    window.nexus.llm.stream(activeChatId, sessionMessages, model);
-                    console.log('TRACE: IPC stream call dispatched successfully.');
-                }, ignitionDelay);
-            } catch (err) {
-                console.log(`TRACE: FATAL ERROR in processChat: ${err.message}`);
-                console.error('[NEXUS:UI] processChat failed:', err);
-                showToast(`Chat Error: ${err.message}`, 'danger');
-                if (send) send.classList.remove('hidden');
-                if (stopBtn) stopBtn.classList.add('hidden');
+            // Ironclad Fix: Use local snapshot, no deadlock
+            const snap = await getDistilledSnapshot();
+            if (snap.success && snap.snapshot) {
+                sessionMessages.push({ 
+                    role: 'system', 
+                    content: `[User is viewing: ${snap.snapshot.title} at ${snap.snapshot.url}. Summary: ${snap.snapshot.summary}]` 
+                });
+                showToast('AI read page context...', 'info');
             }
-        };
+            
+            sessionMessages.push({ role: 'user', content: text });
+            const model = document.getElementById('chat-model-select')?.value;
+            window.nexus.llm.stream(activeChatId, sessionMessages, model);
+        }
 
-        if (send) {
-            send.onclick = (e) => {
-                e.stopImmediatePropagation(); // Core fix: prevent global interceptor double-fire
-                processChat();
-            };
-        }
-        if (stopBtn) {
-            stopBtn.onclick = (e) => {
-                e.stopImmediatePropagation();
-                window.nexus.llm.stop(activeChatId);
-                if (currentBubble) currentBubble.innerText += ' [Stopped]';
-                cleanup(activeChatId);
-            };
-        }
-        if (input) {
-            input.onkeydown = (e) => { 
-                if (e.key === 'Enter' && !e.shiftKey) { 
-                    e.preventDefault(); 
-                    e.stopImmediatePropagation();
-                    processChat(); 
-                } 
-            };
-        }
-    }
-
-    function initAgents() {
-        const list = document.getElementById('agent-list');
-        const createBtn = document.getElementById('btn-create-agent');
-        if (createBtn) createBtn.onclick = () => handleCreateAgent();
-
-        async function load() {
-            const agents = await window.nexus.agents.get();
-            if (agents.length === 0) list.innerHTML = '<div class="empty-state">No Agents found.</div>';
-            else list.innerHTML = agents.map(a => `
-                <div class="agent-card" id="agent-${a.id}">
-                    <div class="agent-card__header">
-                        <div class="agent-card__avatar">${a.emoji || '🤖'}</div>
-                        <div class="agent-card__info">
-                            <div class="agent-card__name">${a.name}</div>
-                            <div class="agent-card__desc">${a.description || ''}</div>
-                        </div>
-                    </div>
-                    <div class="agent-card__actions">
-                        <button class="btn btn-primary btn-sm btn-run" data-id="${a.id}">Run</button>
-                        <button class="btn btn-danger btn-sm btn-stop hidden" id="stop-${a.id}" data-id="${a.id}">Stop</button>
-                        <button class="btn btn-ghost btn-sm btn-edit" data-id="${a.id}">Edit</button>
-                        <button class="btn btn-danger btn-sm btn-delete" data-id="${a.id}">Delete</button>
-                    </div>
-                    <div class="agent-log hidden" id="log-${a.id}"></div>
-                    <div class="agent-interaction hidden" id="interaction-${a.id}" style="margin-top: 8px; display: flex; gap: 8px;">
-                        <input type="text" class="input" id="instruct-input-${a.id}" placeholder="Type instruction to instantly interrupt..." style="flex: 1; padding: 6px; font-size: 12px; background: rgba(0,0,0,0.2);" autocomplete="off">
-                        <button class="btn btn-primary btn-sm btn-instruct" data-id="${a.id}">Send</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-        window.loadAgents = load;
+        if (send) send.onclick = processChat;
+        if (input) input.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); processChat(); } };
+        if (stopBtn) stopBtn.onclick = () => window.nexus.llm.stop(activeChatId);
         
-        // --- Centralized Agent Event Routing ---
-        // We listen globally once to prevent duplicate log entries
-        window.nexus.agents.onStep(({ agentId, step }) => {
-            const container = document.getElementById(`log-${agentId}`);
-            if (!container) return;
-            
-            container.classList.remove('hidden');
-            const el = document.createElement('div');
-            el.className = `agent-log__step agent-log__step--${step.type || 'info'}`;
-            el.innerText = step.content;
-            container.appendChild(el);
-            container.scrollTop = container.scrollHeight;
-        });
-
-        window.nexus.agents.onDone(({ agentId }) => {
-            showToast(`Agent task completed.`, 'success');
-            const card = document.getElementById(`agent-${agentId}`);
-            const stopBtn = document.getElementById(`stop-${agentId}`);
-            const runBtn = card?.querySelector('.btn-run');
-            const interaction = document.getElementById(`interaction-${agentId}`);
-            if (card) card.classList.remove('running');
-            if (stopBtn) stopBtn.classList.add('hidden');
-            if (runBtn) runBtn.classList.remove('hidden');
-            if (interaction) interaction.classList.add('hidden');
-        });
-
-        window.nexus.agents.onError(({ agentId, error }) => {
-            showToast(`Agent Error: ${error}`, 'error');
-            const card = document.getElementById(`agent-${agentId}`);
-            const stopBtn = document.getElementById(`stop-${agentId}`);
-            const runBtn = card?.querySelector('.btn-run');
-            const interaction = document.getElementById(`interaction-${agentId}`);
-            const logContainer = document.getElementById(`log-${agentId}`);
-
-            if (card) card.classList.remove('running');
-            if (stopBtn) stopBtn.classList.add('hidden');
-            if (runBtn) runBtn.classList.remove('hidden');
-            if (interaction) interaction.classList.add('hidden');
-            
-            if (logContainer) {
-                logContainer.classList.remove('hidden');
-                const errEl = document.createElement('div');
-                errEl.className = 'agent-log__step agent-log__step--error';
-                errEl.innerText = `FATAL ERROR: ${error}`;
-                logContainer.appendChild(errEl);
-                logContainer.scrollTop = logContainer.scrollHeight;
-            }
-        });
-
-        load();
+        if (clearBtn) {
+            clearBtn.title = 'Clear Chat History';
+            clearBtn.onclick = () => {
+                sessionMessages = [];
+                if (messagesEl) messagesEl.innerHTML = '<div class="chat__message chat__message--ai"><div class="chat__bubble">Chat history cleared. How can I help?</div></div>';
+                showToast('Chat history cleared.', 'success');
+            };
+        }
     }
 
     async function handleCreateAgent() {
@@ -1192,148 +989,99 @@ document.addEventListener('DOMContentLoaded', async () => {
         input.value = '';
     }
 
+    function initAgents() {
+        const list = document.getElementById('agent-list');
+        const createBtn = document.getElementById('btn-create-agent');
+        // Redundant onclick removed here as it is handled by the global stability listener
+
+        async function load() {
+            const agents = await window.nexus.agents.get();
+            if (agents.length === 0) list.innerHTML = '<div class="empty-state">No Agents found.</div>';
+            else list.innerHTML = agents.map(a => `
+                <div class="agent-card" id="agent-${a.id}">
+                    <div class="agent-card__header">
+                        <div class="agent-card__avatar">${a.emoji || '🤖'}</div>
+                        <div class="agent-card__info">
+                            <div class="agent-card__name">${a.name}</div>
+                            <div class="agent-card__desc">${a.description || 'Specialized AI Agent'}</div>
+                        </div>
+                    </div>
+                    <div class="agent-card__actions">
+                        <button class="btn btn-primary btn-sm btn-run" data-id="${a.id}">Run</button>
+                        <button class="btn btn-ghost btn-sm btn-stop hidden" id="stop-${a.id}" data-id="${a.id}">Stop</button>
+                        <button class="btn btn-ghost btn-sm btn-edit" data-id="${a.id}">Edit</button>
+                        <button class="btn btn-danger btn-sm btn-delete" data-id="${a.id}">Delete</button>
+                    </div>
+                    <div class="agent-log hidden" id="log-${a.id}"></div>
+                    <div class="agent-interaction hidden" id="interaction-${a.id}" style="margin-top: 8px; display: flex; gap: 8px;">
+                        <input type="text" class="input" id="instruct-input-${a.id}" placeholder="Type instruction to instantly interrupt..." style="flex: 1; padding: 6px; font-size: 12px; background: rgba(0,0,0,0.2);" autocomplete="off">
+                        <button class="btn btn-primary btn-sm btn-instruct" data-id="${a.id}">Send</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        window.loadAgents = load;
+        
+        // --- Centralized Agent Event Routing ---
+        window.nexus.agents.onStep(({ agentId, step }) => {
+            const container = document.getElementById(`log-${agentId}`);
+            if (!container) return;
+            
+            container.classList.remove('hidden');
+            const el = document.createElement('div');
+            el.className = `agent-log__step agent-log__step--${step.type || 'info'}`;
+            el.innerText = step.content;
+            container.appendChild(el);
+            container.scrollTop = container.scrollHeight;
+        });
+
+        window.nexus.agents.onDone(({ agentId }) => {
+            showToast(`Agent task completed.`, 'success');
+            const card = document.getElementById(`agent-${agentId}`);
+            const stopBtn = document.getElementById(`stop-${agentId}`);
+            const runBtn = card?.querySelector('.btn-run');
+            const interaction = document.getElementById(`interaction-${agentId}`);
+            if (card) card.classList.remove('running');
+            if (stopBtn) stopBtn.classList.add('hidden');
+            if (runBtn) runBtn.classList.remove('hidden');
+            if (interaction) interaction.classList.add('hidden');
+        });
+
+        window.nexus.agents.onError(({ agentId, error }) => {
+            showToast(`Agent Error: ${error}`, 'error');
+            const card = document.getElementById(`agent-${agentId}`);
+            const stopBtn = document.getElementById(`stop-${agentId}`);
+            const runBtn = card?.querySelector('.btn-run');
+            const interaction = document.getElementById(`interaction-${agentId}`);
+            if (card) card.classList.remove('running');
+            if (stopBtn) stopBtn.classList.add('hidden');
+            if (runBtn) runBtn.classList.remove('hidden');
+            if (interaction) interaction.classList.add('hidden');
+        });
+        
+        load();
+    }
+
     function initNotes() {
         const list = document.getElementById('note-list');
         window.loadNotes = async () => {
             const notes = await window.nexus.notes.get();
-            list.innerHTML = notes.map(n => `<div class="note-card" onclick="window.editNote('${n.id}')"><div>${n.title}</div><small>${n.content.substring(0,30)}...</small></div>`).join('');
+            list.innerHTML = notes.map(n => `
+                <div class="note-card" onclick="window.editNote('${n.id}')">
+                    <div class="note-card__title">${n.title || 'Untitled Note'}</div>
+                    <div class="note-card__preview">${(n.content || '').substring(0, 100)}...</div>
+                    <div class="note-card__meta">
+                        <span>${new Date(n.updatedAt).toLocaleDateString()}</span>
+                    </div>
+                </div>
+            `).join('');
         };
-        window.editNote = async (id) => {
-            const notes = await window.nexus.notes.get();
-            const n = notes.find(i => i.id === id) || {title:'', content:''};
-            const res = await showModal('Note', [{id:'title',label:'Title',value:n.title},{id:'content',label:'Content',type:'textarea',value:n.content}]);
-            if (res) { await window.nexus.notes.save({id, ...res}); window.loadNotes(); }
-        };
-        window.loadNotes();
     }
 
-
-
-
-
-    function initImageGen() {
-        const promptInput = document.getElementById('imagegen-prompt');
-        const sendBtn = document.getElementById('imagegen-send');
-        const gallery = document.getElementById('imagegen-gallery');
-        
-        if (!promptInput || !sendBtn || !gallery) return;
-
-        sendBtn.addEventListener('click', () => {
-            const val = promptInput.value.trim();
-            if (!val) return;
-            
-            promptInput.value = '';
-            
-            // Remove empty state if present
-            const emptyState = gallery.querySelector('.empty-state');
-            if (emptyState) emptyState.remove();
-
-            // Create generation placeholder
-            const card = document.createElement('div');
-            card.style.position = 'relative';
-            card.style.borderRadius = '12px';
-            card.style.overflow = 'hidden';
-            card.style.marginBottom = '16px';
-            card.style.backgroundColor = 'var(--surface)';
-            card.style.minHeight = '200px';
-            card.style.display = 'flex';
-            card.style.flexDirection = 'column';
-            card.style.alignItems = 'center';
-            card.style.justifyContent = 'center';
-            card.style.boxShadow = 'var(--shadow-sm)';
-            
-            const loader = document.createElement('div');
-            loader.innerText = 'Generating image... ✨';
-            loader.style.color = 'var(--text-muted)';
-            loader.style.fontSize = '12px';
-            loader.style.fontWeight = '500';
-            card.appendChild(loader);
-            
-            // Prepend new card to gallery
-            gallery.prepend(card);
-
-            // Fetch natively via img tag connected to pollinations AI
-            // Adds random seed to bypass caching between generations
-            const seed = Math.floor(Math.random() * 1000000);
-            const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(val)}?nologo=true&seed=${seed}`;
-            
-            const img = new Image();
-            img.style.width = '100%';
-            img.style.height = 'auto';
-            img.style.display = 'block';
-            img.style.opacity = '0';
-            img.style.transition = 'opacity 0.3s ease';
-
-            img.onload = () => {
-                loader.remove();
-                card.style.minHeight = 'auto'; // Let it size to the image
-                card.appendChild(img);
-                img.style.opacity = '1';
-                
-                const downloadBtn = document.createElement('button');
-                downloadBtn.className = 'btn btn-primary';
-                downloadBtn.style.position = 'absolute';
-                downloadBtn.style.bottom = '12px';
-                downloadBtn.style.right = '12px';
-                downloadBtn.style.padding = '8px 16px';
-                downloadBtn.style.fontSize = '12px';
-                downloadBtn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-                downloadBtn.style.zIndex = '10';
-                downloadBtn.innerText = 'Download';
-                
-                downloadBtn.onclick = async () => {
-                    const originalText = downloadBtn.innerText;
-                    downloadBtn.innerText = 'Saving...';
-                    try {
-                        const res = await fetch(imgUrl);
-                        const blob = await res.blob();
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `nexus_art_${seed}.png`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                        if (window.showToast) window.showToast('Image downloaded!', 'success');
-                    } catch(e) {
-                        console.error('Download failed', e);
-                        if (window.showToast) window.showToast('Download failed', 'error');
-                    }
-                    downloadBtn.innerText = originalText;
-                };
-
-                card.appendChild(downloadBtn);
-            };
-
-            img.onerror = () => {
-                loader.innerText = 'Failed to generate image. Please try again.';
-                loader.style.color = 'var(--danger)';
-            };
-
-            img.src = imgUrl; // Triggers browser network request
-        });
-        
-        promptInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendBtn.click();
-            }
-        });
-    }
-
-    // Call init routines
+    initChat();
     initImageGen();
-
-
-    function updateSidebarActive(panelId) {
-        elements.navItems.forEach(item => {
-            if (item.getAttribute('data-panel') === panelId) {
-                item.classList.add('active');
-            } else {
-                item.classList.remove('active');
-            }
-        });
-    }
-
-}); // Real End of DOMContentLoaded
+    initAgents();
+    initNotes();
+    createTab();
+    loadAvailableModels();
+});

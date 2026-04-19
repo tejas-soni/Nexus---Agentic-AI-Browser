@@ -181,14 +181,20 @@
 
   <script>
     const input = document.getElementById('omnibox');
-    input.addEventListener('keydown', (e) => {
+    input.addEventListener('keydown', async (e) => {
       if (e.key === 'Enter') {
         const query = input.value.trim();
         if (query) {
-          // Send to main process or handle here
-          console.log('Searching for:', query);
-          // Standard web search fallback
-          window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+          const settings = await window.nexus.settings.get();
+          const engine = settings.searchEngine || 'google';
+          const engines = {
+              google: 'https://www.google.com/search?q=',
+              brave: 'https://search.brave.com/search?q=',
+              duckduckgo: 'https://duckduckgo.com/?q=',
+              bing: 'https://www.bing.com/search?q='
+          };
+          const baseUrl = engines[engine] || engines.google;
+          window.location.href = baseUrl + encodeURIComponent(query);
         }
       }
     });
