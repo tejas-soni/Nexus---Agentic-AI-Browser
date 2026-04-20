@@ -240,6 +240,25 @@ module.exports = function registerIpcHandlers() {
         click: () => event.sender.send('tab:open-new-tab', linkURL)
       });
       template.push({
+        label: 'Open Link in New Window',
+        click: () => {
+          const path = require('path');
+          const newWin = new BrowserWindow({
+            width: 1400, height: 900, minWidth: 900, minHeight: 600,
+            frame: false, titleBarStyle: 'hidden', backgroundColor: '#0A0A0F',
+            webPreferences: {
+              nodeIntegration: false, contextIsolation: true, sandbox: false, webviewTag: true,
+              preload: path.join(__dirname, '..', 'preload', 'preload.js'),
+            },
+            icon: path.join(__dirname, '..', 'assets', 'icons', 'icon.png'),
+          });
+          newWin.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+          newWin.webContents.on('did-finish-load', () => {
+             newWin.webContents.send('tab:open-url', linkURL);
+          });
+        }
+      });
+      template.push({
         label: 'Copy Link Address',
         click: () => clipboard.writeText(linkURL)
       });

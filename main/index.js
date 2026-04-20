@@ -58,6 +58,16 @@ app.whenReady().then(async () => {
   }
 });
 
+// Enforce strict single-tab navigation for webviews: block popups and target="_blank", open in same tab
+app.on('web-contents-created', (event, contents) => {
+  if (contents.getType() === 'webview') {
+    contents.setWindowOpenHandler(({ url }) => {
+      contents.loadURL(url);
+      return { action: 'deny' };
+    });
+  }
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });

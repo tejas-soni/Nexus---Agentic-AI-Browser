@@ -442,6 +442,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         elements.webviewContainer.appendChild(webview);
         setupWebviewEvents(webview, id);
         switchTab(id);
+        if (elements.urlInput) {
+            elements.urlInput.focus();
+            elements.urlInput.select();
+            setTimeout(() => {
+                elements.urlInput.focus();
+                elements.urlInput.select();
+            }, 150);
+        }
     }
 
     function setupWebviewEvents(webview, tabId) {
@@ -508,7 +516,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (tab) { tab.favicon = e.favicons[0]; renderTabs(); } 
         });
 
-        webview.addEventListener('new-window', (e) => { e.preventDefault(); createTab(e.url); });
+        webview.addEventListener('new-window', (e) => { 
+            e.preventDefault(); 
+            webview.loadURL(e.url); 
+        });
+
+        webview.addEventListener('context-menu', (e) => {
+            window.nexus.tabs.sendContextMenu(e.params);
+        });
 
         webview.addEventListener('did-navigate', () => {
             if (state.activeTabId === tabId) updateNavUI();
@@ -565,6 +580,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             elements.urlInput.value = (tab.url.startsWith('nexus://')) ? '' : tab.url;
             updateBookmarkStatus(webview.getURL());
             updateNavUI();
+
+            // Aggressive focus policy: If a user is on an empty page / new tab, 
+            // the address bar MUST hold focus.
+            if (elements.urlInput && elements.urlInput.value.trim() === '') {
+                elements.urlInput.focus();
+                setTimeout(() => {
+                    elements.urlInput.focus();
+                    elements.urlInput.select();
+                }, 150);
+            }
         }
     }
 
@@ -638,22 +663,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             let val = elements.urlInput.value.trim();
             if (!val) return;
             if (!val.includes('://') && !val.startsWith('nexus://')) {
-                const settings = await window.nexus.settings.get();
-                const engine = settings.searchEngine || 'google';
-                const engines = {
-                    google: 'https://www.google.com/search?q=',
-                    brave: 'https://search.brave.com/search?q=',
-                    duckduckgo: 'https://duckduckgo.com/?q=',
-                    bing: 'https://www.bing.com/search?q='
-                };
-                const baseUrl = engines[engine] || engines.google;
-                val = baseUrl + encodeURIComponent(val);
+                if ((val.includes('.') && !val.includes(' ')) || val.startsWith('localhost:') || val === 'localhost') {
+                    val = (val.startsWith('localhost') ? 'http://' : 'https://') + val;
+                } else {
+                    const settings = await window.nexus.settings.get();
+                    const engine = settings.searchEngine || 'google';
+                    const engines = {
+                        google: 'https://www.google.com/search?q=',
+                        brave: 'https://search.brave.com/search?q=',
+                        duckduckgo: 'https://duckduckgo.com/?q=',
+                        bing: 'https://www.bing.com/search?q='
+                    };
+                    const baseUrl = engines[engine] || engines.google;
+                    val = baseUrl + encodeURIComponent(val);
+                }
             }
             navigateTo(val);
         }
     };
 
-    if (elements.btnNewTab) elements.btnNewTab.onclick = () => createTab();
+    if (elements.btnNewTab) {
+        // Stop the native system from focusing the button physically
+        elements.btnNewTab.onmousedown = (e) => e.preventDefault();
+        // Handle the creation in the standard click lifecycle
+        elements.btnNewTab.onclick = (e) => {
+            createTab();
+        };
+    }
 
     // ─── Bridge Events ──────────────────────────────────────────
     window.nexus.tabs.onOpenUrl?.((url) => {
@@ -1085,4 +1121,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     initNotes();
     createTab();
     loadAvailableModels();
+
+    // Force focus strictly on final boot-up payload to guarantee
+    // it survives the Electron renderer window initialization cycle.
+    window.addEventListener('load', () => {
+        if (elements.urlInput && elements.urlInput.value.trim() === '') {
+            setTimeout(() => {
+                elements.urlInput.focus();
+                elements.urlInput.select();
+            }, 100);
+        }
+    });
 });
