@@ -377,6 +377,7 @@ select.input option {
   font-size: var(--text-sm);
   line-height: 1.7;
   word-break: break-word;
+  user-select: text;
 }
 
 .chat__message--ai .chat__bubble {
@@ -614,6 +615,7 @@ select.input option {
   max-height: 200px;
   overflow-y: auto;
   border: 1px solid var(--border);
+  user-select: text;
 }
 
 .agent-log__step {
